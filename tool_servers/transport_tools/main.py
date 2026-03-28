@@ -20,8 +20,7 @@ def _date_label(date_str: str) -> str:
         return date_str
 
 
-@mcp.tool()
-def search_flights(origin: str, destination: str, date: str) -> dict[str, list[dict[str, Any]]]:
+def _search_flights(origin: str, destination: str, date: str) -> dict[str, list[dict[str, Any]]]:
     """Return deterministic mock flight options."""
     price_seed = (len(origin.strip()) * 13) + (len(destination.strip()) * 17)
     base_price = 260 + (price_seed % 200)
@@ -56,10 +55,22 @@ def search_flights(origin: str, destination: str, date: str) -> dict[str, list[d
     return {"flights": flights}
 
 
-@mcp.tool()
-def search_hotels(destination: str, checkin: str, checkout: str) -> dict[str, list[dict[str, Any]]]:
+def _compute_nights(checkin: str, checkout: str) -> int:
+    try:
+        nights = (
+            datetime.strptime(checkout.strip(), "%Y-%m-%d")
+            - datetime.strptime(checkin.strip(), "%Y-%m-%d")
+        ).days
+        if nights <= 0:
+            return 1
+        return nights
+    except ValueError:
+        return 4
+
+
+def _search_hotels(destination: str, checkin: str, checkout: str) -> dict[str, list[dict[str, Any]]]:
     """Return deterministic mock hotel options."""
-    nights = 4
+    nights = _compute_nights(checkin, checkout)
     base = 85 + ((len(destination.strip()) * 11) % 70)
 
     hotels = [
@@ -88,8 +99,7 @@ def search_hotels(destination: str, checkin: str, checkout: str) -> dict[str, li
     return {"hotels": hotels}
 
 
-@mcp.tool()
-def calculate_total_cost(flight_price: float, hotel_total: float, num_travelers: int) -> dict[str, Any]:
+def _calculate_total_cost(flight_price: float, hotel_total: float, num_travelers: int) -> dict[str, Any]:
     """Calculate deterministic trip total with fixed tax/fees rule."""
     flights_total = round(float(flight_price) * int(num_travelers), 2)
     hotels_total = round(float(hotel_total), 2)
@@ -107,6 +117,24 @@ def calculate_total_cost(flight_price: float, hotel_total: float, num_travelers:
             f"Taxes/Fees 12% (${taxes_and_fees}) = ${grand_total}"
         ),
     }
+
+
+@mcp.tool()
+def search_flights(origin: str, destination: str, date: str) -> dict[str, list[dict[str, Any]]]:
+    """Return deterministic mock flight options."""
+    return _search_flights(origin, destination, date)
+
+
+@mcp.tool()
+def search_hotels(destination: str, checkin: str, checkout: str) -> dict[str, list[dict[str, Any]]]:
+    """Return deterministic mock hotel options."""
+    return _search_hotels(destination, checkin, checkout)
+
+
+@mcp.tool()
+def calculate_total_cost(flight_price: float, hotel_total: float, num_travelers: int) -> dict[str, Any]:
+    """Calculate deterministic trip total with fixed tax/fees rule."""
+    return _calculate_total_cost(flight_price, hotel_total, num_travelers)
 
 
 @mcp.custom_route("/tools", methods=["GET"], include_in_schema=False)

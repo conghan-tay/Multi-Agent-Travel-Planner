@@ -74,11 +74,13 @@ _LOCAL_EVENTS: dict[tuple[str, str], list[dict[str, str]]] = {
 }
 
 
-@mcp.tool()
-def get_destination_info(destination: str) -> dict[str, Any]:
+def _get_destination_info(
+    destination: str,
+    data: dict[str, dict[str, Any]] = _DESTINATION_DATA,
+) -> dict[str, Any]:
     """Return deterministic destination profile for itinerary planning."""
     key = destination.strip().lower()
-    info = _DESTINATION_DATA.get(key)
+    info = data.get(key)
     if info:
         return info
 
@@ -100,16 +102,33 @@ def get_destination_info(destination: str) -> dict[str, Any]:
     }
 
 
+def _get_local_events(
+    destination: str,
+    month: str,
+    events_index: dict[tuple[str, str], list[dict[str, str]]] = _LOCAL_EVENTS,
+) -> dict[str, Any]:
+    """Return deterministic local events for a destination and month."""
+    normalized_destination = destination.strip().lower()
+    normalized_month = month.strip().title()
+    key = (normalized_destination, normalized_month)
+    events = events_index.get(key, [])
+    return {
+        "destination": destination.strip().title(),
+        "month": normalized_month,
+        "events": events,
+    }
+
+
+@mcp.tool()
+def get_destination_info(destination: str) -> dict[str, Any]:
+    """Return deterministic destination profile for itinerary planning."""
+    return _get_destination_info(destination)
+
+
 @mcp.tool()
 def get_local_events(destination: str, month: str) -> dict[str, Any]:
     """Return deterministic local events for a destination and month."""
-    key = (destination.strip().lower(), month.strip())
-    events = _LOCAL_EVENTS.get(key, [])
-    return {
-        "destination": destination.strip().title(),
-        "month": month.strip(),
-        "events": events,
-    }
+    return _get_local_events(destination, month)
 
 
 @mcp.custom_route("/tools", methods=["GET"], include_in_schema=False)
