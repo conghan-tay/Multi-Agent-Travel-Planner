@@ -227,6 +227,7 @@ make install
 
 # Install Step 2 dependencies (CrewAI + A2A packages)
 make install-agents
+# Includes pytest for automated deterministic test runs
 make verify-agents
 
 # Use the project interpreter in this terminal
@@ -297,6 +298,7 @@ make verify-tools
 ```
 
 Expected: JSON list of available tools for each server.
+`make sanity` is a print-only manual smoke check; use pytest for assertion-based checks.
 
 ### Module 2 — Sequential Itinerary Crew (Acceptance Check)
 
@@ -309,6 +311,24 @@ Expected: a structured day-by-day itinerary generated after sequential execution
 research → draft → format.
 
 If `destination-tools` is not running, start it with `make start-tools` and retry.
+
+### Automated Tests (Step 1 + Step 2, Deterministic)
+
+```bash
+# Full suite
+source .venv/bin/activate
+python -m pytest -q
+```
+
+```bash
+# Run by module (example)
+python -m pytest -q tests/test_transport_tools.py
+
+# Template for any other module test file
+python -m pytest -q tests/test_<module_name>.py
+```
+
+These tests are deterministic and do not require running tool servers or live LLM/API keys.
 
 ### Module 3 — A2A Agent Cards (Planned / Not Yet Implemented)
 

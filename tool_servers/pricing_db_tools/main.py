@@ -15,20 +15,23 @@ mcp = FastMCP("pricing-db-tools")
 DB_PATH = Path(os.getenv("TRAVEL_DB_PATH", "data/travel.db"))
 
 
-def _connect() -> sqlite3.Connection:
-    if not DB_PATH.exists():
+def _connect(db_path: Path = DB_PATH) -> sqlite3.Connection:
+    if not db_path.exists():
         raise FileNotFoundError(
-            f"Database not found at {DB_PATH}. Run `make seed-db` first."
+            f"Database not found at {db_path}. Run `make seed-db` first."
         )
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
 
 
-@mcp.tool()
-def lookup_avg_price(destination: str, travel_type: str) -> dict[str, Any]:
+def _lookup_avg_price(
+    destination: str,
+    travel_type: str,
+    db_path: Path = DB_PATH,
+) -> dict[str, Any]:
     """Look up average price by destination and travel type."""
-    conn = _connect()
+    conn = _connect(db_path)
     try:
         row = conn.execute(
             """
@@ -61,10 +64,9 @@ def lookup_avg_price(destination: str, travel_type: str) -> dict[str, Any]:
     }
 
 
-@mcp.tool()
-def get_budget_tiers(destination: str) -> dict[str, Any]:
+def _get_budget_tiers(destination: str, db_path: Path = DB_PATH) -> dict[str, Any]:
     """Return budget/midrange/luxury tiers for a destination."""
-    conn = _connect()
+    conn = _connect(db_path)
     try:
         rows = conn.execute(
             """
@@ -88,6 +90,18 @@ def get_budget_tiers(destination: str) -> dict[str, Any]:
         }
 
     return response
+
+
+@mcp.tool()
+def lookup_avg_price(destination: str, travel_type: str) -> dict[str, Any]:
+    """Look up average price by destination and travel type."""
+    return _lookup_avg_price(destination, travel_type)
+
+
+@mcp.tool()
+def get_budget_tiers(destination: str) -> dict[str, Any]:
+    """Return budget/midrange/luxury tiers for a destination."""
+    return _get_budget_tiers(destination)
 
 
 @mcp.custom_route("/tools", methods=["GET"], include_in_schema=False)
