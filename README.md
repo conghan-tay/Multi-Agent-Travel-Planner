@@ -264,10 +264,18 @@ make verify-agents
 ### Module 2 — Specialist crews (direct, bypassing A2A)
 
 ```bash
+# Install CrewAI/A2A deps (once)
+make install-agents
+
+# Step 2 currently implements the itinerary specialist only.
 python -m agents.itinerary "Plan a trip to Paris"
-python -m agents.scout "Flights and hotels NYC to Paris, June 1-7"
-python -m agents.budget "Optimize Paris trip for $2000 budget"
+
+# Optional trace for sequential-task debugging
+python -m agents.itinerary "Plan a 5-day trip to Paris in October for 2 people" --verbose
 ```
+
+If destination tools are unavailable, the itinerary command exits with a clear
+error and suggests starting tool servers via `make start-tools`.
 
 ### Module 3 — A2A Agent Cards
 

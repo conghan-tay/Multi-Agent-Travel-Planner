@@ -12,3 +12,5 @@ logs/
 
 # Local data
 data/travel.db
+
+.env
