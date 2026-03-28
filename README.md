@@ -255,6 +255,12 @@ Expected: JSON list of available tools for each server.
 Note: `requirements.txt` is intentionally Step-1-only. For later modules
 (CrewAI/A2A), install `requirements.agents.txt`.
 
+```bash
+# Agent dependencies (single .venv strategy)
+make install-agents
+make verify-agents
+```
+
 ### Module 2 — Specialist crews (direct, bypassing A2A)
 
 ```bash

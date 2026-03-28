@@ -15,7 +15,7 @@ DEST_PID := $(PID_DIR)/destination-tools.pid
 TRANSPORT_PID := $(PID_DIR)/transport-tools.pid
 PRICING_PID := $(PID_DIR)/pricing-db-tools.pid
 
-.PHONY: venv install bootstrap seed-db start-tools stop check-ports sanity verify-tools
+.PHONY: venv recreate-venv install install-agents verify-agents bootstrap seed-db start-tools stop check-ports sanity verify-tools
 
 venv:
 	@if [ -x "$(PYTHON)" ] && "$(PYTHON)" -V | grep -q "$(PYTHON_VERSION)"; then \
@@ -27,8 +27,20 @@ venv:
 		$(UV) venv --python $(PYTHON_VERSION) $(VENV_DIR); \
 	fi
 
+recreate-venv:
+	$(UV) venv --python $(PYTHON_VERSION) --clear $(VENV_DIR)
+
 install: venv
 	$(UV) pip install --python $(PYTHON) -r requirements.txt
+
+install-agents: venv
+	$(UV) pip install --python $(PYTHON) -r requirements.agents.txt
+
+verify-agents: venv
+	$(PYTHON) -V
+	$(PYTHON) -c "import crewai; print(crewai.__version__)"
+	$(PYTHON) -c "import a2a; print('a2a ok')"
+	$(UV) pip check --python $(PYTHON)
 
 bootstrap: install seed-db
 
