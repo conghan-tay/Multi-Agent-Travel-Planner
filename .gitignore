@@ -1,0 +1,14 @@
+# Python caches
+__pycache__/
+*.pyc
+.DS_Store
+
+# Local envs
+.venv/
+
+# Runtime artifacts
+logs/
+.pids/
+
+# Local data
+data/travel.db

@@ -229,13 +229,31 @@ Each module can be tested independently before wiring everything together.
 ### Module 1 — Tool servers
 
 ```bash
+# One-command setup (creates .venv with Python 3.13.12, installs deps, seeds DB)
+make bootstrap
+
+# Start all tool servers
+make start-tools
+
 # Confirm tool listings are live
 curl http://localhost:8001/tools
 curl http://localhost:8002/tools
 curl http://localhost:8003/tools
+
+# Function-level tool contract sanity checks
+make sanity
+
+# Endpoint-level verification checks
+make verify-tools
+
+# Stop all tool servers
+make stop
 ```
 
 Expected: JSON list of available tools for each server.
+
+Note: `requirements.txt` is intentionally Step-1-only. For later modules
+(CrewAI/A2A), install `requirements.agents.txt`.
 
 ### Module 2 — Specialist crews (direct, bypassing A2A)
 
