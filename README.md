@@ -112,7 +112,7 @@ Switching between OpenAI and Anthropic requires only changing `LLM_PROVIDER` —
 
 ## Running the system
 
-Start all services, then launch the CLI. Each command runs in a separate terminal.
+Current implemented runtime scope is **Step 1 + Step 2**.
 
 ### Step 1 — Seed the database (first run only)
 
@@ -130,21 +130,13 @@ make start-tools
 
 Starts all three MCP tool servers (ports 8001, 8002, 8003) as background processes.
 
-### Step 3 — Start A2A specialist servers
+### Step 3 — Run the Sequential Itinerary Crew (Step 2)
 
 ```bash
-make start-agents
+python -m agents.itinerary "Plan a 5-day trip to Paris in October for 2 people" --verbose
 ```
 
-Starts all three A2A specialist servers (ports 9001, 9002, 9003) as background processes.
-
-### Step 4 — Run the CLI
-
-```bash
-python main.py
-```
-
-Opens an interactive REPL. Enter a travel request and press Enter.
+Runs the direct specialist workflow: research → draft → format.
 
 ### Stopping all services
 
@@ -156,21 +148,17 @@ make stop
 
 ## Basic usage
 
-Once `python main.py` is running, enter natural-language travel requests:
+For the currently implemented Step-2 path, run direct itinerary requests:
 
 ```
-> Plan a 5-day trip to Tokyo in October for 2 people.
-> Find flights and hotels from New York to Tokyo, Oct 1–8.
-> Our total budget is $3000. Optimize the plan.
+python -m agents.itinerary "Plan a 5-day trip to Tokyo in October for 2 people"
+python -m agents.itinerary "Plan a trip to Paris"
 ```
 
-The orchestrator routes each request to the appropriate specialist automatically. Use `verbose=True` in the orchestrator config to see the full LLM reasoning and tool call trace.
+Use `--verbose` to see the CrewAI task/tool trace.
 
-```
-> exit
-```
-
-Ends the session.
+Planned (not yet implemented): A2A specialist servers, orchestrator CLI (`main.py`),
+cooldown guard, and session-state routing flow.
 
 ---
 
@@ -222,19 +210,80 @@ crewai-mas/
 
 ---
 
-## Module-by-module verification
+## Quickstart: Verify Implemented Scope (Step 1 + Step 2)
 
-Each module can be tested independently before wiring everything together.
+Use this section as the source of truth for setup and command order.
 
-### Module 1 — Tool servers
+### First-time setup + end-to-end verification
 
 ```bash
-# One-command setup (creates .venv with Python 3.13.12, installs deps, seeds DB)
-make bootstrap
+cd /Users/conghantay/Desktop/Contract/MultiAgentSystem
 
-# Start all tool servers
+# Create/update local venv (Python 3.13.12 as configured in Makefile)
+make venv
+
+# Install Step 1 dependencies (tool servers)
+make install
+
+# Install Step 2 dependencies (CrewAI + A2A packages)
+make install-agents
+make verify-agents
+
+# Use the project interpreter in this terminal
+source .venv/bin/activate
+
+# Create .env if needed, then set LLM_PROVIDER + API key
+cp .env.example .env
+
+# Seed DB and start tool servers (ports 8001/8002/8003)
+make seed-db
 make start-tools
 
+# Step 1 checks
+curl http://localhost:8001/tools
+curl http://localhost:8002/tools
+curl http://localhost:8003/tools
+make sanity
+make verify-tools
+
+# Step 2 check (sequential itinerary crew)
+python -m agents.itinerary "Plan a 5-day trip to Paris in October for 2 people" --verbose
+```
+
+### Subsequent runs (new terminal)
+
+```bash
+cd /Users/conghantay/Desktop/Contract/MultiAgentSystem
+source .venv/bin/activate
+make start-tools
+python -m agents.itinerary "Plan a 5-day trip to Paris in October for 2 people" --verbose
+```
+
+### Quick troubleshooting
+
+```bash
+# If you see: ModuleNotFoundError: No module named 'crewai'
+source .venv/bin/activate
+make install-agents
+make verify-agents
+
+# Confirm interpreter and package
+which python
+python -c "import crewai; print(crewai.__version__)"
+```
+
+If itinerary fails with auth errors, verify `LLM_PROVIDER` and API key values in `.env`.
+If itinerary fails with tool-connection errors, run `make start-tools` and retry.
+
+## Module-by-module verification
+
+Setup/run order lives in **Quickstart** above. The sections below are acceptance checks only.
+
+### Module 1 — Tool Servers (Acceptance Check)
+
+If this is your first run, complete Quickstart first.
+
+```bash
 # Confirm tool listings are live
 curl http://localhost:8001/tools
 curl http://localhost:8002/tools
@@ -245,31 +294,23 @@ make sanity
 
 # Endpoint-level verification checks
 make verify-tools
-
-# Stop all tool servers
-make stop
 ```
 
 Expected: JSON list of available tools for each server.
 
-Note: `requirements.txt` is intentionally Step-1-only. For later modules
-(CrewAI/A2A), install `requirements.agents.txt`.
-
-```bash
-# Agent dependencies (single .venv strategy)
-make install-agents
-make verify-agents
-```
-
-### Module 2 — Specialist crews (direct, bypassing A2A)
+### Module 2 — Sequential Itinerary Crew (Acceptance Check)
 
 ```bash
 python -m agents.itinerary "Plan a trip to Paris"
-python -m agents.scout "Flights and hotels NYC to Paris, June 1-7"
-python -m agents.budget "Optimize Paris trip for $2000 budget"
+python -m agents.itinerary "Plan a 5-day trip to Paris in October for 2 people" --verbose
 ```
 
-### Module 3 — A2A Agent Cards
+Expected: a structured day-by-day itinerary generated after sequential execution:
+research → draft → format.
+
+If `destination-tools` is not running, start it with `make start-tools` and retry.
+
+### Module 3 — A2A Agent Cards (Planned / Not Yet Implemented)
 
 ```bash
 curl http://localhost:9001/.well-known/agent-card.json | python3 -m json.tool
@@ -277,9 +318,9 @@ curl http://localhost:9002/.well-known/agent-card.json | python3 -m json.tool
 curl http://localhost:9003/.well-known/agent-card.json | python3 -m json.tool
 ```
 
-Expected: valid JSON Agent Cards with `name`, `description`, and `skills` fields.
+Expected (once implemented): valid JSON Agent Cards with `name`, `description`, and `skills` fields.
 
-### Module 4 — Cooldown guard
+### Module 4 — Cooldown guard (Planned / Not Yet Implemented)
 
 Set `COOLDOWN_SECONDS=10` in `.env` for faster testing. Start `python main.py` and enter the same itinerary request twice within 10 seconds. The second call should be blocked:
 
@@ -290,7 +331,7 @@ Set `COOLDOWN_SECONDS=10` in `.env` for faster testing. Start `python main.py` a
 [Cooldown active for itinerary_specialist. Try again in 8 seconds.]
 ```
 
-### Module 5 — Session state
+### Module 5 — Session state (Planned / Not Yet Implemented)
 
 Run three consecutive requests and observe that the orchestrator avoids repeating the same specialist:
 
