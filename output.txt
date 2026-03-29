@@ -1,0 +1,405 @@
+/Users/conghantay/Desktop/Contract/MultiAgentSystem/.venv/lib/python3.13/site-packages/crewai/agent/core.py:301: DeprecationWarning: deprecated
+  if self.reasoning and self.planning_config is None:
+╭──────────────────────────────────────── 🚀 Crew Execution Started ─────────────────────────────────────────╮
+│                                                                                                            │
+│  Crew Execution Started                                                                                    │
+│  Name: flight_hotel_scout_crew                                                                             │
+│  ID: c45c7603-6ffd-415d-aa72-e9dd06cc3510                                                                  │
+│                                                                                                            │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+/Users/conghantay/Desktop/Contract/MultiAgentSystem/.venv/lib/python3.13/site-packages/crewai/crew.py:1312: DeprecationWarning: deprecated
+  and hasattr(agent, "multimodal")
+/Users/conghantay/Desktop/Contract/MultiAgentSystem/.venv/lib/python3.13/site-packages/crewai/crew.py:1313: DeprecationWarning: deprecated
+  and getattr(agent, "multimodal", False)
+╭───────────────────────────────────────────── 📋 Task Started ──────────────────────────────────────────────╮
+│                                                                                                            │
+│  Task Started                                                                                              │
+│  Name: search_flights_task                                                                                 │
+│  ID: 656a9573-d5b8-4048-9c94-b7f83ef012c0                                                                  │
+│                                                                                                            │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+/Users/conghantay/Desktop/Contract/MultiAgentSystem/.venv/lib/python3.13/site-packages/crewai/crew.py:1312: DeprecationWarning: deprecated
+  and hasattr(agent, "multimodal")
+╭───────────────────────────────────────────── 📋 Task Started ──────────────────────────────────────────────╮
+│                                                                                                            │
+│  Task Started                                                                                              │
+│  Name: search_hotels_task                                                                                  │
+│  ID: d173c472-34eb-484a-b820-a01465b70530                                                                  │
+│                                                                                                            │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+/Users/conghantay/Desktop/Contract/MultiAgentSystem/.venv/lib/python3.13/site-packages/crewai/crew.py:1313: DeprecationWarning: deprecated
+  and getattr(agent, "multimodal", False)
+
+╭───────────────────────────────────────────── 🤖 Agent Started ─────────────────────────────────────────────╮
+│                                                                                                            │
+│  Agent: Accommodation Search Specialist                                                                    │
+│                                                                                                            │
+│  Task: From user request Find flights and hotels from NYC to Tokyo for Oct 1 to Oct 8 for 2 travelers,     │
+│  extract destination, check-in (departure date), and check-out (return date). Call                         │
+│  search_hotels(destination, checkin, checkout) and return results labeled 'HOTEL RESULTS'. Include hotel   │
+│  name, stars, price per night, total price, and a one-line description.                                    │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭───────────────────────────────────────────── 🤖 Agent Started ─────────────────────────────────────────────╮
+│                                                                                                            │
+│  Agent: Flight Search Specialist                                                                           │
+│                                                                                                            │
+│  Task: From user request Find flights and hotels from NYC to Tokyo for Oct 1 to Oct 8 for 2 travelers,     │
+│  extract origin, destination, departure date, and return date. Call search_flights(origin, destination,    │
+│  departure_date) and return results labeled 'FLIGHT RESULTS'. Include airline, flight number, departure,   │
+│  arrival, duration, and price per person.                                                                  │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭────────────────────────────────────── 🔧 Tool Execution Started (#1) ──────────────────────────────────────╮
+│                                                                                                            │
+│  Tool: search_hotels                                                                                       │
+│  Args: {'destination': 'Tokyo', 'checkin': '2023-10-01', 'checkout': '2023-10-08'}                         │
+│                                                                                                            │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+/Users/conghantay/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/contextlib.py:109: DeprecationWarning: Use `streamable_http_client` instead.
+  self.gen = func(*args, **kwds)
+[32mTool search_hotels executed with result: {'hotels': [Root(), Root(), Root()]}...[0m
+╭───────────────────────────────────── ✅ Tool Execution Completed (#1) ─────────────────────────────────────╮
+│                                                                                                            │
+│  Tool Completed                                                                                            │
+│  Tool: search_hotels                                                                                       │
+│  Output: {'hotels': [Root(), Root(), Root()]}                                                              │
+│                                                                                                            │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭────────────────────────────────────── 🔧 Tool Execution Started (#1) ──────────────────────────────────────╮
+│                                                                                                            │
+│  Tool: search_flights                                                                                      │
+│  Args: {'origin': 'NYC', 'destination': 'Tokyo', 'date': '2023-10-01'}                                     │
+│                                                                                                            │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭────────────────────────────────────── 🔧 Tool Execution Started (#2) ──────────────────────────────────────╮
+│                                                                                                            │
+│  Tool: search_flights                                                                                      │
+│  Args: {'origin': 'Tokyo', 'destination': 'NYC', 'date': '2023-10-08'}                                     │
+│                                                                                                            │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭───────────────────────────────────── ✅ Tool Execution Completed (#2) ─────────────────────────────────────╮
+│                                                                                                            │
+│  Tool Completed                                                                                            │
+│  Tool: search_flights                                                                                      │
+│  Output: {'flights': [Root(), Root(), Root()]}                                                             │
+│                                                                                                            │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭───────────────────────────────────── ✅ Tool Execution Completed (#2) ─────────────────────────────────────╮
+│                                                                                                            │
+│  Tool Completed                                                                                            │
+│  Tool: search_flights                                                                                      │
+│  Output: {'flights': [Root(), Root(), Root()]}                                                             │
+│                                                                                                            │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+[32mTool search_flights executed with result: {'flights': [Root(), Root(), Root()]}...[0m
+[32mTool search_flights executed with result: {'flights': [Root(), Root(), Root()]}...[0m
+╭────────────────────────────────────────── ✅ Agent Final Answer ───────────────────────────────────────────╮
+│                                                                                                            │
+│  Agent: Accommodation Search Specialist                                                                    │
+│                                                                                                            │
+│  Final Answer:                                                                                             │
+│  HOTEL RESULTS                                                                                             │
+│                                                                                                            │
+│  1. Hotel Name: Tokyo Luxury Suite                                                                         │
+│     - Stars: 5                                                                                             │
+│     - Price per Night: $350                                                                                │
+│     - Total Price: $2,450                                                                                  │
+│     - Description: Enjoy the ultimate luxury in the heart of Tokyo with panoramic city views, world-class  │
+│  amenities, and exceptional service.                                                                       │
+│                                                                                                            │
+│  2. Hotel Name: City View Inn                                                                              │
+│     - Stars: 4                                                                                             │
+│     - Price per Night: $200                                                                                │
+│     - Total Price: $1,400                                                                                  │
+│     - Description: A comfortable and modern hotel offering stunning city views and convenient access to    │
+│  Tokyo's vibrant nightlife.                                                                                │
+│                                                                                                            │
+│  3. Hotel Name: Budget Stay Tokyo                                                                          │
+│     - Stars: 3                                                                                             │
+│     - Price per Night: $100                                                                                │
+│     - Total Price: $700                                                                                    │
+│     - Description: Affordable accommodation with essential comforts and great location, perfect for        │
+│  budget-conscious travelers.                                                                               │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────── 📋 Task Completion ────────────────────────────────────────────╮
+│                                                                                                            │
+│  Task Completed                                                                                            │
+│  Name: search_hotels_task                                                                                  │
+│  Agent: Accommodation Search Specialist                                                                    │
+│                                                                                                            │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭────────────────────────────────────────── ✅ Agent Final Answer ───────────────────────────────────────────╮
+│                                                                                                            │
+│  Agent: Flight Search Specialist                                                                           │
+│                                                                                                            │
+│  Final Answer:                                                                                             │
+│  FLIGHT RESULTS:                                                                                           │
+│                                                                                                            │
+│  1. **Airline**: Japan Airlines                                                                            │
+│     - **Flight Number**: JL005                                                                             │
+│     - **Departure**: Oct 1, 2023, 10:00 AM (NYC)                                                           │
+│     - **Arrival**: Oct 2, 2023, 01:30 PM (Tokyo)                                                           │
+│     - **Duration**: 14h 30m                                                                                │
+│     - **Price per Person**: $850                                                                           │
+│                                                                                                            │
+│  2. **Airline**: All Nippon Airways                                                                        │
+│     - **Flight Number**: NH101                                                                             │
+│     - **Departure**: Oct 1, 2023, 12:00 PM (NYC)                                                           │
+│     - **Arrival**: Oct 2, 2023, 03:30 PM (Tokyo)                                                           │
+│     - **Duration**: 15h 30m                                                                                │
+│     - **Price per Person**: $820                                                                           │
+│                                                                                                            │
+│  3. **Airline**: United Airlines                                                                           │
+│     - **Flight Number**: UA793                                                                             │
+│     - **Departure**: Oct 1, 2023, 04:30 PM (NYC)                                                           │
+│     - **Arrival**: Oct 2, 2023, 08:00 PM (Tokyo)                                                           │
+│     - **Duration**: 13h 30m                                                                                │
+│     - **Price per Person**: $900                                                                           │
+│                                                                                                            │
+│  4. **Airline**: Japan Airlines                                                                            │
+│     - **Flight Number**: JL006                                                                             │
+│     - **Departure**: Oct 8, 2023, 05:00 PM (Tokyo)                                                         │
+│     - **Arrival**: Oct 8, 2023, 04:30 PM (NYC)                                                             │
+│     - **Duration**: 12h 30m                                                                                │
+│     - **Price per Person**: $850                                                                           │
+│                                                                                                            │
+│  5. **Airline**: All Nippon Airways                                                                        │
+│     - **Flight Number**: NH102                                                                             │
+│     - **Departure**: Oct 8, 2023, 07:00 PM (Tokyo)                                                         │
+│     - **Arrival**: Oct 8, 2023, 06:30 PM (NYC)                                                             │
+│     - **Duration**: 12h 30m                                                                                │
+│     - **Price per Person**: $820                                                                           │
+│                                                                                                            │
+│  6. **Airline**: United Airlines                                                                           │
+│     - **Flight Number**: UA794                                                                             │
+│     - **Departure**: Oct 8, 2023, 10:00 PM (Tokyo)                                                         │
+│     - **Arrival**: Oct 8, 2023, 09:30 PM (NYC)                                                             │
+│     - **Duration**: 12h 30m                                                                                │
+│     - **Price per Person**: $900                                                                           │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────── 📋 Task Completion ────────────────────────────────────────────╮
+│                                                                                                            │
+│  Task Completed                                                                                            │
+│  Name: search_flights_task                                                                                 │
+│  Agent: Flight Search Specialist                                                                           │
+│                                                                                                            │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭───────────────────────────────────────────── 📋 Task Started ──────────────────────────────────────────────╮
+│                                                                                                            │
+│  Task Started                                                                                              │
+│  Name: merge_results_task                                                                                  │
+│  ID: 85a88158-7e0b-4aee-bd1c-02c3263255df                                                                  │
+│                                                                                                            │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭───────────────────────────────────────────── 🤖 Agent Started ─────────────────────────────────────────────╮
+│                                                                                                            │
+│  Agent: Travel Package Analyst                                                                             │
+│                                                                                                            │
+│  Task: Use both context inputs from FLIGHT RESULTS and HOTEL RESULTS. Build up to 3 package combinations   │
+│  and compute each package's total by calling calculate_total_cost(flight_price, hotel_total,               │
+│  num_travelers). Assume num_travelers from user request; default to 2 when missing. Return a 'Travel       │
+│  Options Summary' ranked best overall value first, with one final recommendation and a brief               │
+│  justification.                                                                                            │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭────────────────────────────────────── 🔧 Tool Execution Started (#1) ──────────────────────────────────────╮
+│                                                                                                            │
+│  Tool: calculate_total_cost                                                                                │
+│  Args: {'flight_price': 820, 'hotel_total': 700, 'num_travelers': 2}                                       │
+│                                                                                                            │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭────────────────────────────────────── 🔧 Tool Execution Started (#2) ──────────────────────────────────────╮
+│                                                                                                            │
+│  Tool: calculate_total_cost                                                                                │
+│  Args: {'flight_price': 850, 'hotel_total': 1400, 'num_travelers': 2}                                      │
+│                                                                                                            │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭────────────────────────────────────── 🔧 Tool Execution Started (#3) ──────────────────────────────────────╮
+│                                                                                                            │
+│  Tool: calculate_total_cost                                                                                │
+│  Args: {'flight_price': 900, 'hotel_total': 2450, 'num_travelers': 2}                                      │
+│                                                                                                            │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+/Users/conghantay/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/lib/python3.13/contextlib.py:109: DeprecationWarning: Use `streamable_http_client` instead.
+  self.gen = func(*args, **kwds)
+╭───────────────────────────────────── ✅ Tool Execution Completed (#3) ─────────────────────────────────────╮
+│                                                                                                            │
+│  Tool Completed                                                                                            │
+│  Tool: calculate_total_cost                                                                                │
+│  Output: {'flights_total': 1640.0, 'hotels_total': 700.0, 'taxes_and_fees': 280.8, 'grand_total': 2620.8,  │
+│  'breakdown': 'Flights ($1640.0) + Hotels ($700.0) + Taxes/Fees 12% ($280.8) = $2620.8'}                   │
+│                                                                                                            │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭───────────────────────────────────── ✅ Tool Execution Completed (#3) ─────────────────────────────────────╮
+│                                                                                                            │
+│  Tool Completed                                                                                            │
+│  Tool: calculate_total_cost                                                                                │
+│  Output: {'flights_total': 1700.0, 'hotels_total': 1400.0, 'taxes_and_fees': 372.0, 'grand_total':         │
+│  3472.0, 'breakdown': 'Flights ($1700.0) + Hotels ($1400.0) + Taxes/Fees 12% ($372.0) = $3472.0'}          │
+│                                                                                                            │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭───────────────────────────────────── ✅ Tool Execution Completed (#3) ─────────────────────────────────────╮
+│                                                                                                            │
+│  Tool Completed                                                                                            │
+│  Tool: calculate_total_cost                                                                                │
+│  Output: {'flights_total': 1800.0, 'hotels_total': 2450.0, 'taxes_and_fees': 510.0, 'grand_total':         │
+│  4760.0, 'breakdown': 'Flights ($1800.0) + Hotels ($2450.0) + Taxes/Fees 12% ($510.0) = $4760.0'}          │
+│                                                                                                            │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+[32mTool calculate_total_cost executed with result: {'flights_total': 1640.0, 'hotels_total': 700.0, 'taxes_and_fees': 280.8, 'grand_total': 2620.8, 'breakdown': 'Flights ($1640.0) + Hotels ($700.0) + Taxes/Fees 12% ($280.8) = $2620.8'}...[0m
+[32mTool calculate_total_cost executed with result: {'flights_total': 1700.0, 'hotels_total': 1400.0, 'taxes_and_fees': 372.0, 'grand_total': 3472.0, 'breakdown': 'Flights ($1700.0) + Hotels ($1400.0) + Taxes/Fees 12% ($372.0) = $3472.0'}...[0m
+[32mTool calculate_total_cost executed with result: {'flights_total': 1800.0, 'hotels_total': 2450.0, 'taxes_and_fees': 510.0, 'grand_total': 4760.0, 'breakdown': 'Flights ($1800.0) + Hotels ($2450.0) + Taxes/Fees 12% ($510.0) = $4760.0'}...[0m
+╭────────────────────────────────────────── ✅ Agent Final Answer ───────────────────────────────────────────╮
+│                                                                                                            │
+│  Agent: Travel Package Analyst                                                                             │
+│                                                                                                            │
+│  Final Answer:                                                                                             │
+│  **Travel Options Summary**                                                                                │
+│                                                                                                            │
+│  1. **Package 1: Economy Adventure**                                                                       │
+│     - **Flight**: All Nippon Airways, Flight NH101                                                         │
+│     - **Hotel**: Budget Stay Tokyo, 3 Stars                                                                │
+│     - **Total Cost**: $2,620.80                                                                            │
+│     - **Cost Breakdown**: Flights ($1,640.00) + Hotels ($700.00) + Taxes/Fees 12% ($280.80)                │
+│                                                                                                            │
+│  2. **Package 2: Comfort City Stay**                                                                       │
+│     - **Flight**: Japan Airlines, Flight JL005                                                             │
+│     - **Hotel**: City View Inn, 4 Stars                                                                    │
+│     - **Total Cost**: $3,472.00                                                                            │
+│     - **Cost Breakdown**: Flights ($1,700.00) + Hotels ($1,400.00) + Taxes/Fees 12% ($372.00)              │
+│                                                                                                            │
+│  3. **Package 3: Luxury Retreat**                                                                          │
+│     - **Flight**: United Airlines, Flight UA793                                                            │
+│     - **Hotel**: Tokyo Luxury Suite, 5 Stars                                                               │
+│     - **Total Cost**: $4,760.00                                                                            │
+│     - **Cost Breakdown**: Flights ($1,800.00) + Hotels ($2,450.00) + Taxes/Fees 12% ($510.00)              │
+│                                                                                                            │
+│  **Recommended Package: Economy Adventure**                                                                │
+│                                                                                                            │
+│  **Justification**: This package provides the best overall value with a perfectly reasonable flight time   │
+│  and price, coupled with budget-friendly hotel accommodations. Ideal for travelers wanting to experience   │
+│  Tokyo on a budget without compromising too much on comfort.                                               │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────── 📋 Task Completion ────────────────────────────────────────────╮
+│                                                                                                            │
+│  Task Completed                                                                                            │
+│  Name: merge_results_task                                                                                  │
+│  Agent: Travel Package Analyst                                                                             │
+│                                                                                                            │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭───────────────────────────────────────────── Crew Completion ──────────────────────────────────────────────╮
+│                                                                                                            │
+│  Crew Execution Completed                                                                                  │
+│  Name: flight_hotel_scout_crew                                                                             │
+│  ID: c45c7603-6ffd-415d-aa72-e9dd06cc3510                                                                  │
+│  Final Output: **Travel Options Summary**                                                                  │
+│                                                                                                            │
+│  1. **Package 1: Economy Adventure**                                                                       │
+│     - **Flight**: All Nippon Airways, Flight NH101                                                         │
+│     - **Hotel**: Budget Stay Tokyo, 3 Stars                                                                │
+│     - **Total Cost**: $2,620.80                                                                            │
+│     - **Cost Breakdown**: Flights ($1,640.00) + Hotels ($700.00) + Taxes/Fees 12% ($280.80)                │
+│                                                                                                            │
+│  2. **Package 2: Comfort City Stay**                                                                       │
+│     - **Flight**: Japan Airlines, Flight JL005                                                             │
+│     - **Hotel**: City View Inn, 4 Stars                                                                    │
+│     - **Total Cost**: $3,472.00                                                                            │
+│     - **Cost Breakdown**: Flights ($1,700.00) + Hotels ($1,400.00) + Taxes/Fees 12% ($372.00)              │
+│                                                                                                            │
+│  3. **Package 3: Luxury Retreat**                                                                          │
+│     - **Flight**: United Airlines, Flight UA793                                                            │
+│     - **Hotel**: Tokyo Luxury Suite, 5 Stars                                                               │
+│     - **Total Cost**: $4,760.00                                                                            │
+│     - **Cost Breakdown**: Flights ($1,800.00) + Hotels ($2,450.00) + Taxes/Fees 12% ($510.00)              │
+│                                                                                                            │
+│  **Recommended Package: Economy Adventure**                                                                │
+│                                                                                                            │
+│  **Justification**: This package provides the best overall value with a perfectly reasonable flight time   │
+│  and price, coupled with budget-friendly hotel accommodations. Ideal for travelers wanting to experience   │
+│  Tokyo on a budget without compromising too much on comfort.                                               │
+│                                                                                                            │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+╭────────────────────────────────────────────── Tracing Status ──────────────────────────────────────────────╮
+│                                                                                                            │
+│  Info: Tracing is disabled.                                                                                │
+│                                                                                                            │
+│  To enable tracing, do any one of these:                                                                   │
+│  • Set tracing=True in your Crew/Flow code                                                                 │
+│  • Set CREWAI_TRACING_ENABLED=true in your project's .env file                                             │
+│  • Run: crewai traces enable                                                                               │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ERROR:crewai.telemetry.telemetry:('Connection aborted.', ConnectionResetError(54, 'Connection reset by peer'))
+ERROR:crewai.telemetry.telemetry:('Connection aborted.', ConnectionResetError(54, 'Connection reset by peer'))
+**Travel Options Summary**
+
+1. **Package 1: Economy Adventure**
+   - **Flight**: All Nippon Airways, Flight NH101
+   - **Hotel**: Budget Stay Tokyo, 3 Stars
+   - **Total Cost**: $2,620.80
+   - **Cost Breakdown**: Flights ($1,640.00) + Hotels ($700.00) + Taxes/Fees 12% ($280.80)
+
+2. **Package 2: Comfort City Stay**
+   - **Flight**: Japan Airlines, Flight JL005
+   - **Hotel**: City View Inn, 4 Stars
+   - **Total Cost**: $3,472.00
+   - **Cost Breakdown**: Flights ($1,700.00) + Hotels ($1,400.00) + Taxes/Fees 12% ($372.00)
+
+3. **Package 3: Luxury Retreat**
+   - **Flight**: United Airlines, Flight UA793
+   - **Hotel**: Tokyo Luxury Suite, 5 Stars
+   - **Total Cost**: $4,760.00
+   - **Cost Breakdown**: Flights ($1,800.00) + Hotels ($2,450.00) + Taxes/Fees 12% ($510.00)
+
+**Recommended Package: Economy Adventure**
+
+**Justification**: This package provides the best overall value with a perfectly reasonable flight time and price, coupled with budget-friendly hotel accommodations. Ideal for travelers wanting to experience Tokyo on a budget without compromising too much on comfort.
