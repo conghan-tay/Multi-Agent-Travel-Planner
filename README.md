@@ -249,6 +249,9 @@ make verify-tools
 
 # Step 2 check (sequential itinerary crew)
 python -m agents.itinerary "Plan a 5-day trip to Paris in October for 2 people" --verbose
+
+# Step 3 check (parallel scout crew)
+python -m agents.scout "Find flights and hotels from NYC to Tokyo for Oct 1 to Oct 8 for 2 travelers" --verbose
 ```
 
 ### Subsequent runs (new terminal)
@@ -311,6 +314,20 @@ Expected: a structured day-by-day itinerary generated after sequential execution
 research → draft → format.
 
 If `destination-tools` is not running, start it with `make start-tools` and retry.
+
+### Module 2 — Parallel Scout Crew (Acceptance Check)
+
+```bash
+python -m agents.scout "Find flights and hotels from NYC to Tokyo for Oct 1 to Oct 8 for 2 travelers"
+python -m agents.scout "Find flights and hotels from NYC to Tokyo for Oct 1 to Oct 8 for 2 travelers" --verbose
+```
+
+Expected: a combined travel options summary generated after parallel execution:
+flight search + hotel search (concurrent), then merge + package recommendation.
+
+With verbose trace enabled, flight and hotel tasks should start at near-identical timestamps, and merge should run only after both complete.
+
+If `transport-tools` is not running, start it with `make start-tools` and retry.
 
 ### Automated Tests (Step 1 + Step 2, Deterministic)
 
