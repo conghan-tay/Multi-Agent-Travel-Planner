@@ -89,7 +89,7 @@ class FlightHotelScoutCrew:
             name="search_flights_task",
             description=(
                 "From user request {user_request}, extract origin, destination, "
-                "departure date, and return date. Call search_flights(origin, "
+                "departure date. Call search_flights(origin, "
                 "destination, departure_date) and return results labeled "
                 "'FLIGHT RESULTS'. Include airline, flight number, departure, "
                 "arrival, duration, and price per person."
