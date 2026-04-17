@@ -11,7 +11,11 @@ from .crew import BudgetOptimizerCrew
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="python -m agents.budget",
-        description="Run Step-4 BudgetOptimizerCrew directly (no A2A/orchestrator).",
+        description=(
+            "Run Step-4 BudgetOptimizerCrew directly (no A2A/orchestrator). "
+            "Request must include origin, destination, target budget, travelers, "
+            "trip length/dates, one flight price per traveler, and one hotel total."
+        ),
     )
     parser.add_argument("request", help="Natural-language budget optimization request.")
     parser.add_argument(

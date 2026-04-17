@@ -1,42 +1,92 @@
-"""Step 4: BudgetOptimizerCrew implemented with CrewAI Flow and router loop."""
+"""Step 4: BudgetOptimizerCrew implemented with strict schema + Flow router loop."""
 
 from __future__ import annotations
 
-import json
 import os
 import re
-from datetime import datetime
+from datetime import date
 from typing import Any
 
 from crewai import Agent, Crew, Process, Task
 from crewai.flow.flow import Flow, listen, router, start
+from crewai.tasks.task_output import TaskOutput
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
-from .tools import get_budget_tiers_tool, lookup_avg_price_tool
-
-VALIDATION_ERROR_MESSAGE = (
-    "Validation error: missing plan context for budget optimization. "
-    "Please include current flight option(s), hotel option(s), trip length/dates, "
-    "and traveler count, or paste an itinerary/package summary."
+from .tools import (
+    calculate_total_cost_transport,
+    get_budget_tiers_tool,
+    lookup_avg_flight_price_tool,
+    lookup_avg_hotel_price_tool,
 )
 
+VALIDATION_ERROR_PREFIX = "Validation error"
 
-class PlanContextValidation(BaseModel):
-    is_valid: bool = False
+
+class BudgetContextPayload(BaseModel):
+    is_valid: bool = True
     reason: str = ""
-    destination: str | None = None
-    target_budget: float | None = None
-    traveler_count: int | None = None
+    origin: str = Field(min_length=2)
+    destination: str = Field(min_length=2)
+    target_budget: float
+    traveler_count: int
     trip_nights: int | None = None
-    flight_prices_per_person: list[float] = Field(default_factory=list)
-    hotel_totals: list[float] = Field(default_factory=list)
+    start_date: date | None = None
+    end_date: date | None = None
+    flight_price_per_person: float
+    hotel_total: float
     current_total_estimate: float | None = None
     package_summary: str | None = None
+
+    @field_validator("target_budget", "flight_price_per_person", "hotel_total")
+    @classmethod
+    def _positive_float(cls, value: float) -> float:
+        if value <= 0:
+            raise ValueError("must be greater than 0")
+        return float(value)
+
+    @field_validator("traveler_count")
+    @classmethod
+    def _positive_travelers(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("must be greater than 0")
+        return int(value)
+
+    @field_validator("trip_nights")
+    @classmethod
+    def _positive_nights(cls, value: int | None) -> int | None:
+        if value is not None and value <= 0:
+            raise ValueError("must be greater than 0")
+        return int(value) if value is not None else None
+
+    @model_validator(mode="after")
+    def _cross_validate(self) -> "BudgetContextPayload":
+        if not self.is_valid:
+            message = self.reason.strip() or "validator marked input as invalid"
+            raise ValueError(message)
+
+        if self.start_date and self.end_date:
+            nights_from_dates = (self.end_date - self.start_date).days
+            if nights_from_dates <= 0:
+                raise ValueError("end_date must be after start_date")
+            if self.trip_nights is None:
+                self.trip_nights = nights_from_dates
+            elif self.trip_nights != nights_from_dates:
+                raise ValueError(
+                    "trip_nights is inconsistent with start_date/end_date"
+                )
+
+        if self.trip_nights is None:
+            raise ValueError(
+                "trip_nights is required unless start_date and end_date are provided"
+            )
+
+        return self
 
 
 class BudgetOptimizerState(BaseModel):
     user_request: str = ""
+    origin: str = ""
     destination: str = ""
     target_budget: float = 0.0
     current_cost: float = 0.0
@@ -78,7 +128,7 @@ def _parse_money_value(value: str) -> float | None:
 
 def _extract_new_total(text: str) -> float | None:
     match = re.search(
-        r"New Estimated Total:\s*\$?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)",
+        r"\*{0,2}\s*New\s+Estimated\s+Total\s*\*{0,2}\s*:\s*\$?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)",
         text,
         flags=re.IGNORECASE,
     )
@@ -87,48 +137,9 @@ def _extract_new_total(text: str) -> float | None:
     return _parse_money_value(match.group(1))
 
 
-def _extract_json_object(text: str) -> dict[str, Any] | None:
-    stripped = text.strip()
-    if stripped.startswith("```"):
-        stripped = re.sub(r"^```[a-zA-Z]*", "", stripped).strip()
-        stripped = stripped.removesuffix("```").strip()
-
-    try:
-        loaded = json.loads(stripped)
-        if isinstance(loaded, dict):
-            return loaded
-    except json.JSONDecodeError:
-        pass
-
-    candidate = re.search(r"\{[\s\S]*\}", stripped)
-    if not candidate:
-        return None
-
-    try:
-        loaded = json.loads(candidate.group(0))
-        if isinstance(loaded, dict):
-            return loaded
-    except json.JSONDecodeError:
-        return None
-    return None
-
-
-def _parse_date_range_nights(text: str) -> int | None:
-    found = re.findall(r"\b(\d{4}-\d{2}-\d{2})\b", text)
-    if len(found) < 2:
-        return None
-    try:
-        start_date = datetime.strptime(found[0], "%Y-%m-%d")
-        end_date = datetime.strptime(found[1], "%Y-%m-%d")
-    except ValueError:
-        return None
-
-    nights = (end_date - start_date).days
-    return nights if nights > 0 else None
-
-
 class BudgetOptimizerFlow(Flow[BudgetOptimizerState]):
     """Flow that validates context and iteratively optimizes cost against budget."""
+
     _skip_auto_memory = True
 
     def __init__(self, llm_model: str, verbose: bool = False):
@@ -140,30 +151,32 @@ class BudgetOptimizerFlow(Flow[BudgetOptimizerState]):
     def initialize(self) -> str:
         user_request = self.state.user_request.strip()
         if not user_request:
-            self.state.validation_error = VALIDATION_ERROR_MESSAGE
-            return "validation_failed"
-
-        parsed = self._validate_plan_context(user_request)
-        if not parsed.is_valid:
-            self.state.validation_error = VALIDATION_ERROR_MESSAGE
-            return "validation_failed"
-
-        if parsed.target_budget is None or parsed.target_budget <= 0:
             self.state.validation_error = (
-                f"{VALIDATION_ERROR_MESSAGE} Also include a target budget (e.g., '$3000')."
+                f"{VALIDATION_ERROR_PREFIX}: input request is empty. "
+                "Required fields: origin, destination, target budget, traveler count, "
+                "trip length/dates, flight price per traveler, hotel total."
             )
             return "validation_failed"
 
-        baseline_cost = self._compute_initial_cost(parsed)
-        if baseline_cost <= 0:
-            self.state.validation_error = VALIDATION_ERROR_MESSAGE
+        try:
+            parsed = self._validate_plan_context(user_request)
+        except RuntimeError as exc:
+            self.state.validation_error = str(exc)
             return "validation_failed"
 
-        self.state.destination = parsed.destination or "Unknown"
+        baseline_cost = self._compute_current_total_estimate(parsed)
+        if baseline_cost <= 0:
+            self.state.validation_error = (
+                f"{VALIDATION_ERROR_PREFIX}: failed to compute package total from transport-tools"
+            )
+            return "validation_failed"
+
+        self.state.origin = parsed.origin
+        self.state.destination = parsed.destination
         self.state.target_budget = parsed.target_budget
         self.state.current_cost = baseline_cost
         self.state.current_plan = parsed.package_summary or user_request
-        self.state.traveler_count = parsed.traveler_count or 1
+        self.state.traveler_count = parsed.traveler_count
         self.state.trip_nights = parsed.trip_nights or 1
         self.state.iteration_count = 0
         self.state.savings_log = []
@@ -228,37 +241,34 @@ class BudgetOptimizerFlow(Flow[BudgetOptimizerState]):
             f"{self.state.current_plan}"
         )
 
-    def _validate_plan_context(self, user_request: str) -> PlanContextValidation:
+    def _validate_plan_context(self, user_request: str) -> BudgetContextPayload:
         validator_agent = Agent(
             role="Travel Plan Context Validator",
             goal=(
-                "Validate whether budget-optimization input includes sufficient "
-                "plan/package context and extract normalized fields for downstream use."
+                "Extract strict budget optimization fields from user input in valid JSON."
             ),
             backstory=(
-                "You are a strict intake specialist for budget optimization. You check "
-                "whether the request contains concrete package details and extract them "
-                "into clean structured JSON."
+                "You are a strict intake validator. You return only JSON with exact fields "
+                "required for travel package cost optimization."
             ),
             llm=self.llm_model,
             verbose=self.verbose,
         )
 
+        
+
         validation_task = Task(
             name="validate_budget_context_task",
             description=(
-                "Evaluate user request: {user_request}. Return JSON only with these keys: "
-                "is_valid (bool), reason (str), destination (str|null), "
-                "target_budget (number|null), traveler_count (int|null), "
-                "trip_nights (int|null), flight_prices_per_person (number[]), "
-                "hotel_totals (number[]), current_total_estimate (number|null), "
-                "package_summary (str|null).\n"
-                "Validation rule: valid only if the request includes either\n"
-                "1) current flight option(s), hotel option(s), trip length/dates, and traveler count,\n"
-                "or 2) a pasted itinerary/package summary with enough cost detail to estimate totals.\n"
-                "If budget is missing, set is_valid=false and explain in reason."
+                "Evaluate user request: {user_request}. "
+                "Extract these required fields: origin, destination, target_budget, "
+                "traveler_count, flight_price_per_person, hotel_total.\n"
+                "Optional keys: trip_nights, start_date, end_date, package_summary.\n"
+                "This contract supports ONE flight price and ONE hotel total only.\n"
+                "Set is_valid=True when no required fields are missing. ELSE set is_valid=False and set the reason why in reason field"
             ),
-            expected_output="Valid JSON object only, no markdown fences.",
+            expected_output="A structured BudgetContextPayload output.",
+            output_pydantic=BudgetContextPayload,
             agent=validator_agent,
         )
 
@@ -270,183 +280,56 @@ class BudgetOptimizerFlow(Flow[BudgetOptimizerState]):
             verbose=self.verbose,
         )
 
-        llm_output = str(validator_crew.kickoff(inputs={"user_request": user_request}))
-        parsed_json = _extract_json_object(llm_output)
-        if parsed_json is not None:
-            normalized = self._normalize_validation_payload(parsed_json, user_request)
-            heuristic = self._heuristic_validation(user_request)
-            if normalized.is_valid:
-                return normalized
-            if heuristic.is_valid:
-                return heuristic
+        result = validator_crew.kickoff(inputs={"user_request": user_request})
+        task_output: TaskOutput | None = getattr(result, "tasks_output", [None])[0]
+        if task_output is None:
+            raise RuntimeError(
+                f"{VALIDATION_ERROR_PREFIX}: validator task output missing"
+            )
 
-        return self._heuristic_validation(user_request)
+        pydantic_output = task_output.pydantic
+        if pydantic_output is None:
+            raise RuntimeError(
+                f"{VALIDATION_ERROR_PREFIX}: validator typed output missing"
+            )
 
-    def _normalize_validation_payload(
-        self, payload: dict[str, Any], user_request: str
-    ) -> PlanContextValidation:
-        def _as_float_list(values: Any) -> list[float]:
-            if not isinstance(values, list):
-                return []
-            result: list[float] = []
-            for value in values:
-                if isinstance(value, (int, float)):
-                    if float(value) > 0:
-                        result.append(float(value))
-                elif isinstance(value, str):
-                    parsed = _parse_money_value(value)
-                    if parsed is not None and parsed > 0:
-                        result.append(parsed)
-            return result
+        if not isinstance(pydantic_output, BudgetContextPayload):
+            raise RuntimeError(
+                f"{VALIDATION_ERROR_PREFIX}: validator typed output invalid type"
+            )
 
-        raw_nights = payload.get("trip_nights")
-        trip_nights = int(raw_nights) if isinstance(raw_nights, (int, float)) and raw_nights > 0 else None
+        try:
+            return BudgetContextPayload.model_validate(pydantic_output.model_dump())
+        except ValidationError as exc:
+            raise RuntimeError(
+                f"{VALIDATION_ERROR_PREFIX}: invalid budget context schema: {exc.errors()}"
+            ) from exc
 
-        raw_travelers = payload.get("traveler_count")
-        traveler_count = (
-            int(raw_travelers)
-            if isinstance(raw_travelers, (int, float)) and raw_travelers > 0
-            else None
+    def _compute_current_total_estimate(self, parsed: BudgetContextPayload) -> float:
+        response = calculate_total_cost_transport(
+            flight_price=parsed.flight_price_per_person,
+            hotel_total=parsed.hotel_total,
+            num_travelers=parsed.traveler_count,
         )
-
-        raw_budget = payload.get("target_budget")
-        target_budget: float | None = None
-        if isinstance(raw_budget, (int, float)):
-            target_budget = float(raw_budget)
-        elif isinstance(raw_budget, str):
-            target_budget = _parse_money_value(raw_budget)
-
-        raw_total = payload.get("current_total_estimate")
-        current_total_estimate: float | None = None
-        if isinstance(raw_total, (int, float)):
-            current_total_estimate = float(raw_total)
-        elif isinstance(raw_total, str):
-            current_total_estimate = _parse_money_value(raw_total)
-
-        normalized = PlanContextValidation(
-            is_valid=bool(payload.get("is_valid", False)),
-            reason=str(payload.get("reason", "")).strip(),
-            destination=(
-                str(payload.get("destination")).strip()
-                if isinstance(payload.get("destination"), str)
-                and str(payload.get("destination")).strip()
-                else None
-            ),
-            target_budget=target_budget,
-            traveler_count=traveler_count,
-            trip_nights=trip_nights,
-            flight_prices_per_person=_as_float_list(payload.get("flight_prices_per_person")),
-            hotel_totals=_as_float_list(payload.get("hotel_totals")),
-            current_total_estimate=current_total_estimate,
-            package_summary=(
-                str(payload.get("package_summary")).strip()
-                if isinstance(payload.get("package_summary"), str)
-                and str(payload.get("package_summary")).strip()
-                else user_request
-            ),
-        )
-
-        if normalized.target_budget is None or normalized.target_budget <= 0:
-            normalized.is_valid = False
-            return normalized
-
-        has_minimum_fields = all(
-            [
-                bool(normalized.flight_prices_per_person),
-                bool(normalized.hotel_totals),
-                normalized.trip_nights is not None,
-                normalized.traveler_count is not None,
-            ]
-        )
-        has_summary_cost = normalized.current_total_estimate is not None
-
-        normalized.is_valid = normalized.is_valid and (has_minimum_fields or has_summary_cost)
-        return normalized
-
-    def _heuristic_validation(self, user_request: str) -> PlanContextValidation:
-        request_lower = user_request.lower()
-
-        budget_match = re.search(
-            r"(?:budget(?:\s+is|\s+of)?|under|within)\s*\$?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)",
-            request_lower,
-        )
-        target_budget = _parse_money_value(budget_match.group(1)) if budget_match else None
-
-        travelers_match = re.search(r"(\d+)\s*(?:traveler|travellers|travelers|people|persons)", request_lower)
-        traveler_count = int(travelers_match.group(1)) if travelers_match else None
-
-        nights_match = re.search(r"(\d+)\s*(?:night|nights|day|days)", request_lower)
-        trip_nights = int(nights_match.group(1)) if nights_match else _parse_date_range_nights(user_request)
-
-        flight_prices = [
-            float(match.replace(",", ""))
-            for match in re.findall(r"flight[^\n$]*\$\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)", request_lower)
-        ]
-        hotel_totals = [
-            float(match.replace(",", ""))
-            for match in re.findall(r"hotel[^\n$]*\$\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)", request_lower)
-        ]
-
-        destination_match = re.search(r"(?:to|in)\s+([A-Za-z ]{2,40})", user_request)
-        destination = destination_match.group(1).strip() if destination_match else None
-
-        total_match = re.search(r"(?:total|package)\s*(?:cost|price)?\s*[:=]?\s*\$\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)", request_lower)
-        current_total_estimate = (
-            _parse_money_value(total_match.group(1)) if total_match else None
-        )
-
-        has_minimum_fields = bool(flight_prices and hotel_totals and traveler_count and trip_nights)
-        has_summary_cost = current_total_estimate is not None
-
-        return PlanContextValidation(
-            is_valid=bool(target_budget and (has_minimum_fields or has_summary_cost)),
-            reason="Heuristic fallback parser.",
-            destination=destination,
-            target_budget=target_budget,
-            traveler_count=traveler_count,
-            trip_nights=trip_nights,
-            flight_prices_per_person=flight_prices,
-            hotel_totals=hotel_totals,
-            current_total_estimate=current_total_estimate,
-            package_summary=user_request,
-        )
-
-    def _compute_initial_cost(self, parsed: PlanContextValidation) -> float:
-        if parsed.current_total_estimate is not None and parsed.current_total_estimate > 0:
-            return parsed.current_total_estimate
-
-        if (
-            parsed.flight_prices_per_person
-            and parsed.hotel_totals
-            and parsed.traveler_count
-            and parsed.traveler_count > 0
-        ):
-            cheapest_flight = min(parsed.flight_prices_per_person)
-            cheapest_hotel_total = min(parsed.hotel_totals)
-            return (cheapest_flight * parsed.traveler_count) + cheapest_hotel_total
-
-        if parsed.destination and parsed.trip_nights and parsed.traveler_count:
-            avg_flight = lookup_avg_price_tool.func(parsed.destination, "flight")
-            avg_hotel = lookup_avg_price_tool.func(parsed.destination, "hotel_midrange")
-
-            flight_component = float(avg_flight.get("avg_price", 0.0)) * parsed.traveler_count
-            hotel_component = float(avg_hotel.get("avg_price", 0.0)) * parsed.trip_nights
-            return flight_component + hotel_component
-
+        grand_total = response.get("grand_total")
+        if isinstance(grand_total, (int, float)):
+            return float(grand_total)
         return 0.0
 
     def _run_analysis_task(self) -> str:
         budget_analysis_agent = Agent(
             role="Travel Budget Analyst",
             goal=(
-                "Assess current plan cost against target budget, benchmark against "
-                "destination pricing, and identify biggest savings opportunities."
+                "Assess plan cost against budget and benchmark against destination tiers."
             ),
             backstory=(
-                "You are a forensic travel budget analyst. You quantify overspend and "
-                "return practical savings recommendations."
+                "You are a forensic travel budget analyst focused on concrete savings paths."
             ),
-            tools=[lookup_avg_price_tool, get_budget_tiers_tool],
+            tools=[
+                lookup_avg_flight_price_tool,
+                lookup_avg_hotel_price_tool,
+                get_budget_tiers_tool,
+            ],
             llm=self.llm_model,
             verbose=self.verbose,
         )
@@ -455,17 +338,19 @@ class BudgetOptimizerFlow(Flow[BudgetOptimizerState]):
             name="analyze_budget_task",
             description=(
                 "Analyze this plan against budget using tool calls as needed.\n"
+                f"Origin: {self.state.origin}\n"
                 f"Destination: {self.state.destination}\n"
                 f"Current Estimated Total: ${self.state.current_cost:.2f}\n"
                 f"Target Budget: ${self.state.target_budget:.2f}\n"
                 f"Travelers: {self.state.traveler_count}\n"
                 f"Trip Nights: {self.state.trip_nights}\n"
                 f"Current Plan:\n{self.state.current_plan}\n"
-                "Return a Budget Gap Analysis with explicit savings opportunities."
+                "Use lookup_avg_flight_price(destination), lookup_avg_hotel_price(destination, tier), "
+                "and get_budget_tiers(destination). Do not call lookup_avg_price with arbitrary travel_type."
             ),
             expected_output=(
-                "Budget Gap Analysis including current total, target budget, gap, "
-                "benchmark references, and top cost-reduction actions."
+                "Budget Gap Analysis including current total, target budget, gap, benchmark "
+                "references, and top cost-reduction actions."
             ),
             agent=budget_analysis_agent,
         )
@@ -484,14 +369,12 @@ class BudgetOptimizerFlow(Flow[BudgetOptimizerState]):
         plan_adjustment_agent = Agent(
             role="Travel Plan Optimizer",
             goal=(
-                "Apply concrete changes to reduce cost while preserving trip quality, "
-                "and always output an updated estimated total."
+                "Apply concrete cost reductions and always provide a new estimated total."
             ),
             backstory=(
-                "You are a tactical optimizer. You convert budget analysis into specific "
-                "plan swaps with clear savings math."
+                "You are a tactical optimizer translating benchmark data into specific swaps."
             ),
-            tools=[lookup_avg_price_tool],
+            tools=[lookup_avg_flight_price_tool, lookup_avg_hotel_price_tool],
             llm=self.llm_model,
             verbose=self.verbose,
         )
@@ -500,13 +383,15 @@ class BudgetOptimizerFlow(Flow[BudgetOptimizerState]):
             name="adjust_plan_task",
             description=(
                 "Using the budget analysis below, apply 1-2 concrete adjustments.\n"
+                f"Origin: {self.state.origin}\n"
                 f"Destination: {self.state.destination}\n"
                 f"Current Estimated Total: ${self.state.current_cost:.2f}\n"
                 f"Target Budget: ${self.state.target_budget:.2f}\n"
                 f"Travelers: {self.state.traveler_count}\n"
                 f"Trip Nights: {self.state.trip_nights}\n"
                 f"Budget Analysis:\n{analysis_output}\n"
-                "Return the updated plan and include this exact final line format:\n"
+                "Use lookup_avg_flight_price and lookup_avg_hotel_price only.\n"
+                "Return the updated plan and include a parseable final line exactly like:\n"
                 "New Estimated Total: $X"
             ),
             expected_output=(

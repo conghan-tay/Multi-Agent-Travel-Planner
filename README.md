@@ -149,7 +149,7 @@ Runs async fan-out (flights + hotels) with sequential merge.
 ### Step 5 — Run the Budget Optimizer Flow (Step 4)
 
 ```bash
-python -m agents.budget 'Optimize this package under $3000. Flights: $900 and $1050 per person. Hotels: $1400 and $1800 total. Dates: 2026-10-01 to 2026-10-08 for 2 travelers.' --verbose
+python -m agents.budget 'Optimize this package under $3000. Route: NYC to Tokyo. Flight: $900 per traveler. Hotel: $1400 total. Dates: 2026-10-01 to 2026-10-08 for 2 travelers.' --verbose
 ```
 
 Runs validation + iterative flow routing. If minimum plan context is missing, it returns a validation error instead of starting optimization.
@@ -170,7 +170,7 @@ For current direct specialist usage, run:
 python -m agents.itinerary "Plan a 5-day trip to Tokyo in October for 2 people"
 python -m agents.itinerary "Plan a trip to Paris"
 python -m agents.scout "Find flights and hotels from NYC to Tokyo for Oct 1 to Oct 8 for 2 travelers"
-python -m agents.budget 'Optimize this package under $3000. Flights: $900. Hotels: $1400 total. Dates: 2026-10-01 to 2026-10-08 for 2 travelers.'
+python -m agents.budget 'Optimize this package under $3000. Route: NYC to Tokyo. Flight: $900 per traveler. Hotel: $1400 total. Dates: 2026-10-01 to 2026-10-08 for 2 travelers.'
 ```
 
 Use `--verbose` to see the CrewAI task/tool trace.
@@ -271,7 +271,7 @@ python -m agents.itinerary "Plan a 5-day trip to Paris in October for 2 people" 
 python -m agents.scout "Find flights and hotels from NYC to Tokyo for Oct 1 to Oct 8 for 2 travelers" --verbose
 
 # Step 4 check (budget optimizer flow crew)
-python -m agents.budget 'Optimize this package under $3000. Flights: $900 and $1050 per person. Hotels: $1400 and $1800 total. Dates: 2026-10-01 to 2026-10-08 for 2 travelers.' --verbose
+python -m agents.budget 'Optimize this package under $3000. Route: NYC to Tokyo. Flight: $900 per traveler. Hotel: $1400 total. Dates: 2026-10-01 to 2026-10-08 for 2 travelers.' --verbose
 ```
 
 ### Subsequent runs (new terminal)
@@ -282,7 +282,7 @@ source .venv/bin/activate
 make start-tools
 python -m agents.itinerary "Plan a 5-day trip to Paris in October for 2 people" --verbose
 python -m agents.scout "Find flights and hotels from NYC to Tokyo for Oct 1 to Oct 8 for 2 travelers" --verbose
-python -m agents.budget 'Optimize this package under $3000. Flights: $900 per person. Hotels: $1400 total. Dates: 2026-10-01 to 2026-10-08 for 2 travelers.' --verbose
+python -m agents.budget 'Optimize this package under $3000. Route: NYC to Tokyo. Flight: $900 per traveler. Hotel: $1400 total. Dates: 2026-10-01 to 2026-10-08 for 2 travelers.' --verbose
 ```
 
 ### Quick troubleshooting
@@ -354,8 +354,8 @@ If `transport-tools` is not running, start it with `make start-tools` and retry.
 ### Module 2 — Budget Optimizer Flow Crew (Acceptance Check)
 
 ```bash
-python -m agents.budget 'Optimize this package under $3000. Flights: $900 and $1050 per person. Hotels: $1400 and $1800 total. Dates: 2026-10-01 to 2026-10-08 for 2 travelers.'
-python -m agents.budget 'Optimize this package under $3000. Flights: $900 and $1050 per person. Hotels: $1400 and $1800 total. Dates: 2026-10-01 to 2026-10-08 for 2 travelers.' --verbose
+python -m agents.budget 'Optimize this package under $3000. Route: NYC to Tokyo. Flight: $900 per traveler. Hotel: $1400 total. Dates: 2026-10-01 to 2026-10-08 for 2 travelers.'
+python -m agents.budget 'Optimize this package under $3000. Route: NYC to Tokyo. Flight: $900 per traveler. Hotel: $1400 total. Dates: 2026-10-01 to 2026-10-08 for 2 travelers.' --verbose
 ```
 
 Expected:
