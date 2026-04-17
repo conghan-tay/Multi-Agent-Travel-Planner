@@ -273,7 +273,12 @@ class BudgetOptimizerFlow(Flow[BudgetOptimizerState]):
         llm_output = str(validator_crew.kickoff(inputs={"user_request": user_request}))
         parsed_json = _extract_json_object(llm_output)
         if parsed_json is not None:
-            return self._normalize_validation_payload(parsed_json, user_request)
+            normalized = self._normalize_validation_payload(parsed_json, user_request)
+            heuristic = self._heuristic_validation(user_request)
+            if normalized.is_valid:
+                return normalized
+            if heuristic.is_valid:
+                return heuristic
 
         return self._heuristic_validation(user_request)
 
