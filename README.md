@@ -112,7 +112,7 @@ Switching between OpenAI and Anthropic requires only changing `LLM_PROVIDER` —
 
 ## Running the system
 
-Current implemented runtime scope is **Step 1 + Step 2**.
+Current implemented runtime scope is **Step 1 + Step 4** (tool servers + itinerary + scout + budget flow specialist).
 
 ### Step 1 — Seed the database (first run only)
 
@@ -138,6 +138,22 @@ python -m agents.itinerary "Plan a 5-day trip to Paris in October for 2 people" 
 
 Runs the direct specialist workflow: research → draft → format.
 
+### Step 4 — Run the Parallel Scout Crew (Step 3)
+
+```bash
+python -m agents.scout "Find flights and hotels from NYC to Tokyo for Oct 1 to Oct 8 for 2 travelers" --verbose
+```
+
+Runs async fan-out (flights + hotels) with sequential merge.
+
+### Step 5 — Run the Budget Optimizer Flow (Step 4)
+
+```bash
+python -m agents.budget 'Optimize this package under $3000. Route: NYC to Tokyo. Flight: $900 per traveler. Hotel: $1400 total. Dates: 2026-10-01 to 2026-10-08 for 2 travelers.' --verbose
+```
+
+Runs validation + iterative flow routing. If minimum plan context is missing, it returns a validation error instead of starting optimization.
+
 ### Stopping all services
 
 ```bash
@@ -148,17 +164,18 @@ make stop
 
 ## Basic usage
 
-For the currently implemented Step-2 path, run direct itinerary requests:
+For current direct specialist usage, run:
 
 ```
 python -m agents.itinerary "Plan a 5-day trip to Tokyo in October for 2 people"
 python -m agents.itinerary "Plan a trip to Paris"
+python -m agents.scout "Find flights and hotels from NYC to Tokyo for Oct 1 to Oct 8 for 2 travelers"
+python -m agents.budget 'Optimize this package under $3000. Route: NYC to Tokyo. Flight: $900 per traveler. Hotel: $1400 total. Dates: 2026-10-01 to 2026-10-08 for 2 travelers.'
 ```
 
 Use `--verbose` to see the CrewAI task/tool trace.
 
-Planned (not yet implemented): A2A specialist servers, orchestrator CLI (`main.py`),
-cooldown guard, and session-state routing flow.
+Planned (not yet implemented): A2A specialist servers, orchestrator CLI (`main.py`), cooldown guard, and session-state routing flow.
 
 ---
 
@@ -252,6 +269,9 @@ python -m agents.itinerary "Plan a 5-day trip to Paris in October for 2 people" 
 
 # Step 3 check (parallel scout crew)
 python -m agents.scout "Find flights and hotels from NYC to Tokyo for Oct 1 to Oct 8 for 2 travelers" --verbose
+
+# Step 4 check (budget optimizer flow crew)
+python -m agents.budget 'Optimize this package under $3000. Route: NYC to Tokyo. Flight: $900 per traveler. Hotel: $1400 total. Dates: 2026-10-01 to 2026-10-08 for 2 travelers.' --verbose
 ```
 
 ### Subsequent runs (new terminal)
@@ -261,6 +281,8 @@ cd /Users/conghantay/Desktop/Contract/MultiAgentSystem
 source .venv/bin/activate
 make start-tools
 python -m agents.itinerary "Plan a 5-day trip to Paris in October for 2 people" --verbose
+python -m agents.scout "Find flights and hotels from NYC to Tokyo for Oct 1 to Oct 8 for 2 travelers" --verbose
+python -m agents.budget 'Optimize this package under $3000. Route: NYC to Tokyo. Flight: $900 per traveler. Hotel: $1400 total. Dates: 2026-10-01 to 2026-10-08 for 2 travelers.' --verbose
 ```
 
 ### Quick troubleshooting
@@ -329,7 +351,21 @@ With verbose trace enabled, flight and hotel tasks should start at near-identica
 
 If `transport-tools` is not running, start it with `make start-tools` and retry.
 
-### Automated Tests (Step 1 + Step 2, Deterministic)
+### Module 2 — Budget Optimizer Flow Crew (Acceptance Check)
+
+```bash
+python -m agents.budget 'Optimize this package under $3000. Route: NYC to Tokyo. Flight: $900 per traveler. Hotel: $1400 total. Dates: 2026-10-01 to 2026-10-08 for 2 travelers.'
+python -m agents.budget 'Optimize this package under $3000. Route: NYC to Tokyo. Flight: $900 per traveler. Hotel: $1400 total. Dates: 2026-10-01 to 2026-10-08 for 2 travelers.' --verbose
+```
+
+Expected:
+- Validation runs before optimization and rejects requests missing plan/package context.
+- For valid requests, the flow iterates and adjusts costs until budget is met or 3 iterations are reached.
+- Verbose trace shows analysis/adjustment loop with router-based stop condition.
+
+If `pricing-db-tools` is not running, start it with `make start-tools` and retry.
+
+### Automated Tests (Step 1 + Step 4, Deterministic)
 
 ```bash
 # Full suite
