@@ -172,6 +172,44 @@ curl http://localhost:9003/.well-known/agent-card.json | python3 -m json.tool
 
 For full delegation behavior, tool servers must also be running (`make start-tools`).
 
+### A2A Prompt Test Harness
+
+Prerequisites:
+- `make start-tools`
+- `make start-agents`
+
+Run all three fixed prompts (itinerary, scout, budget):
+
+```bash
+python -m scripts.a2a_prompt_tests --target all
+```
+
+Run one specialist only:
+
+```bash
+python -m scripts.a2a_prompt_tests --target itinerary
+python -m scripts.a2a_prompt_tests --target scout
+python -m scripts.a2a_prompt_tests --target budget
+```
+
+Run with verbose diagnostics (request/response details + server log snapshots):
+
+```bash
+python -m scripts.a2a_prompt_tests --target all --verbose
+```
+
+Optional deterministic run folder name:
+
+```bash
+python -m scripts.a2a_prompt_tests --target all --run-id smoke_2026_04_23
+```
+
+Artifacts are always written to:
+
+```text
+logs/a2a_test_runs/<run-id>/
+```
+
 ### Stopping all services
 
 ```bash
