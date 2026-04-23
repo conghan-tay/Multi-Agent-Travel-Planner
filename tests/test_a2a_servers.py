@@ -8,7 +8,7 @@ from a2a_servers import budget_server, itinerary_server, runtime, scout_server
 
 
 def test_itinerary_agent_card_metadata():
-    client = TestClient(itinerary_server.app)
+    client = TestClient(itinerary_server.make_app())
     response = client.get("/.well-known/agent-card.json")
     assert response.status_code == 200
     payload = response.json()
@@ -18,7 +18,7 @@ def test_itinerary_agent_card_metadata():
 
 
 def test_scout_agent_card_metadata():
-    client = TestClient(scout_server.app)
+    client = TestClient(scout_server.make_app())
     response = client.get("/.well-known/agent-card.json")
     assert response.status_code == 200
     payload = response.json()
@@ -28,7 +28,7 @@ def test_scout_agent_card_metadata():
 
 
 def test_budget_agent_card_metadata():
-    client = TestClient(budget_server.app)
+    client = TestClient(budget_server.make_app())
     response = client.get("/.well-known/agent-card.json")
     assert response.status_code == 200
     payload = response.json()

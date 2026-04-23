@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from a2a.types import AgentSkill
+from dotenv import load_dotenv
 
 from agents.scout import FlightHotelScoutCrew
 
@@ -31,13 +32,18 @@ def run_scout_specialist(user_request: str) -> str:
     return FlightHotelScoutCrew(verbose=False).run(user_request)
 
 
-app = build_app(spec=SPEC, runner=run_scout_specialist)
+def make_app():
+    load_dotenv(override=True)
+    return build_app(spec=SPEC, runner=run_scout_specialist)
 
 
 def main() -> None:
-    run_specialist_server(spec=SPEC, runner=run_scout_specialist, program_name="python -m a2a_servers.scout_server")
+    run_specialist_server(
+        spec=SPEC,
+        runner=run_scout_specialist,
+        program_name="python -m a2a_servers.scout_server",
+    )
 
 
 if __name__ == "__main__":
     main()
-
