@@ -91,3 +91,39 @@ def test_runtime_bridge_forwards_execute_and_cancel(monkeypatch):
     asyncio.run(bridge.cancel(context=object(), event_queue=object()))
     assert calls == ["execute", "cancel"]
 
+
+def test_runtime_build_app_uses_default_spec_port_in_card_url():
+    spec = runtime.SpecialistServerSpec(
+        specialist_id="demo_specialist",
+        display_name="Demo Specialist",
+        description="demo",
+        port=9555,
+        skills=[],
+    )
+    app = runtime.build_app(spec=spec, runner=lambda _: "ok")
+    client = TestClient(app)
+    response = client.get("/.well-known/agent-card.json")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["url"] == "http://127.0.0.1:9555"
+
+
+def test_runtime_build_app_uses_host_port_override_in_card_url():
+    spec = runtime.SpecialistServerSpec(
+        specialist_id="demo_specialist",
+        display_name="Demo Specialist",
+        description="demo",
+        port=9555,
+        skills=[],
+    )
+    app = runtime.build_app(
+        spec=spec,
+        runner=lambda _: "ok",
+        host="0.0.0.0",
+        port=9999,
+    )
+    client = TestClient(app)
+    response = client.get("/.well-known/agent-card.json")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["url"] == "http://0.0.0.0:9999"

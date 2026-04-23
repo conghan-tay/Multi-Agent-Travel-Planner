@@ -93,12 +93,18 @@ class CrewAIA2AExecutorBridge(A2AAgentExecutor):
         await cancel_task(context, event_queue)
 
 
-def build_app(spec: SpecialistServerSpec, runner: Callable[[str], str]):
+def build_app(
+    spec: SpecialistServerSpec,
+    runner: Callable[[str], str],
+    host: str = "127.0.0.1",
+    port: int | None = None,
+):
     """Build a FastAPI app exposing A2A JSON-RPC and Agent Card endpoints."""
     from a2a.server.apps.jsonrpc import A2AFastAPIApplication
 
     adapter_agent = build_adapter_agent(spec=spec, runner=runner)
-    base_url = f"http://127.0.0.1:{spec.port}"
+    effective_port = port or spec.port
+    base_url = f"http://{host}:{effective_port}"
     agent_card = adapter_agent.to_agent_card(base_url)
 
     request_handler = DefaultRequestHandler(
@@ -145,5 +151,5 @@ def run_specialist_server(
         default_port=spec.port,
     )
     args = parser.parse_args(argv)
-    app = build_app(spec=spec, runner=runner)
+    app = build_app(spec=spec, runner=runner, host=args.host, port=args.port)
     run_server(app=app, host=args.host, port=args.port, log_level=args.log_level)
