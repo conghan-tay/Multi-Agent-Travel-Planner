@@ -30,7 +30,7 @@ jobs:
 
       - name: Run Claude Code Review
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           CI_REVIEW: "true"
           HEAD_REF: ${{ github.head_ref }}
         run: |
