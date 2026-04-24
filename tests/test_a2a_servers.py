@@ -105,7 +105,7 @@ def test_runtime_build_app_uses_default_spec_port_in_card_url():
     response = client.get("/.well-known/agent-card.json")
     assert response.status_code == 200
     payload = response.json()
-    assert payload["url"] == "http://127.0.0.1:9555"
+    assert payload["url"] == "http://127.0.0.1:9555/a2a"
 
 
 def test_runtime_build_app_uses_host_port_override_in_card_url():
@@ -126,4 +126,4 @@ def test_runtime_build_app_uses_host_port_override_in_card_url():
     response = client.get("/.well-known/agent-card.json")
     assert response.status_code == 200
     payload = response.json()
-    assert payload["url"] == "http://0.0.0.0:9999"
+    assert payload["url"] == "http://0.0.0.0:9999/a2a"

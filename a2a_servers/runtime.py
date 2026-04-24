@@ -105,7 +105,9 @@ def build_app(
     adapter_agent = build_adapter_agent(spec=spec, runner=runner)
     effective_port = port or spec.port
     base_url = f"http://{host}:{effective_port}"
-    agent_card = adapter_agent.to_agent_card(base_url)
+    agent_card = adapter_agent.to_agent_card(base_url).model_copy(
+        update={"url": f"{base_url}{JSONRPC_PATH}"}
+    )
 
     request_handler = DefaultRequestHandler(
         agent_executor=CrewAIA2AExecutorBridge(adapter_agent),
