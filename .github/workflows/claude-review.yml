@@ -64,7 +64,7 @@ jobs:
           path: ${{ env.REPORT_FILE }}
           retention-days: 30
 
-      - name: Extract must-fix items and post PR comment
+      - name: Post verdict comment and apply label
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -75,30 +75,30 @@ jobs:
             exit 1
           fi
 
-          MUST_FIX=$(python3 scripts/extract_must_fix.py "$REPORT_FILE")
+          VERDICT_SECTION=$(python3 scripts/extract_must_fix.py "$REPORT_FILE")
 
-          HAS_MUST_FIX=false
-          [ -n "$MUST_FIX" ] && HAS_MUST_FIX=true
+          NEEDS_BLOCK=false
+          [ -n "$VERDICT_SECTION" ] && NEEDS_BLOCK=true
 
           PR_NUMBER="${{ github.event.pull_request.number }}"
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          if [ "$HAS_MUST_FIX" = "true" ]; then
-            HEADER="## 🔴 Claude Code Review — Must-Fix Items Found"
+          if [ "$NEEDS_BLOCK" = "true" ]; then
+            HEADER="## 🔴 Claude Code Review — Not Ready to Merge"
           else
-            HEADER="## ✅ Claude Code Review — No Must-Fix Items"
+            HEADER="## ✅ Claude Code Review — Ready to Merge"
           fi
 
           COMMENT="${HEADER}
 
-          ${MUST_FIX}
+          ${VERDICT_SECTION}
 
           ---
           📄 [Download full report](${RUN_URL}) (available under **Artifacts** on the Actions run page)"
 
           gh pr comment "$PR_NUMBER" --body "$COMMENT"
 
-          if [ "$HAS_MUST_FIX" = "true" ]; then
+          if [ "$NEEDS_BLOCK" = "true" ]; then
             gh label create "blocked" \
               --color "B60205" \
               --description "PR has must-fix items from code review" \

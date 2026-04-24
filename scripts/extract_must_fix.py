@@ -1,40 +1,27 @@
 #!/usr/bin/env python3
 """
-Extract the Must-Fix Items section from a Claude code review report.
+Read a Claude code review report and extract the Final Verdict section.
+Prints the section to stdout when the verdict is NOT READY TO MERGE (signals
+the PR should be blocked). Prints nothing when the verdict is READY TO MERGE.
 Usage: python3 scripts/extract_must_fix.py <report_file>
-Exits 0 with content printed to stdout if must-fix items are found.
-Exits 0 with no output if section is missing (not an error).
-Exits 1 if the file cannot be read.
+Exits 0 in both cases. Exits 1 if the file cannot be read.
 """
 
 import sys
 import pathlib
 
+NOT_READY_TOKEN = "VERDICT: NOT READY TO MERGE"
 
-def extract_must_fix(content: str) -> str:
-    start = content.find("🔴 Must-Fix Items")
-    if start == -1:
+
+def extract_verdict(content: str) -> str:
+    if NOT_READY_TOKEN not in content:
         return ""
 
-    next_section_markers = [
-        "🟡 Recommended Refactors",
-        "🟢 Optimization",
-        "📝 Improved",
-        "⚖️ Final Verdict",
-        "## ",
-    ]
-    end = len(content)
-    for marker in next_section_markers:
-        pos = content.find(marker, start + 1)
-        if pos != -1 and pos < end:
-            end = pos
+    start = content.find("⚖️ Final Verdict")
+    if start == -1:
+        return NOT_READY_TOKEN
 
-    section = content[start:end]
-    lines = [
-        line for line in section.splitlines()
-        if "🔴 Must-Fix Items" not in line and line.strip()
-    ]
-    return "\n".join(lines)
+    return content[start:].strip()
 
 
 def main() -> None:
@@ -53,7 +40,7 @@ def main() -> None:
         print(f"Error reading file: {e}", file=sys.stderr)
         sys.exit(1)
 
-    result = extract_must_fix(content)
+    result = extract_verdict(content)
     if result:
         print(result)
 

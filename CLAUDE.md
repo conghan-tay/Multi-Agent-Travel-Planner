@@ -31,7 +31,7 @@ After reading them, confirm:
 2. The Recommended Build Order (from the PRD)
 3. Determine the build step as follows:
    - If the env var `CI_REVIEW` is set to `true`, or `CI` is set to `true`, do not ask. Instead:
-     - Inspect the changed files from `git diff main...HEAD --name-only`
+     - Inspect the changed files from `git diff origin/main...HEAD --name-only`
      - If the changes map clearly to a step in the Recommended Build Order, state which step and proceed
      - If the changes are outside the Recommended Build Order (e.g. CI/CD config, tooling,
        infrastructure, GitHub Actions workflows, documentation), state that explicitly:
@@ -46,7 +46,7 @@ Do not begin the review until step 3 is resolved.
 ---
 
 ### Step 2: Code Review
-Review the diff of the current branch against main (run `git diff main...HEAD` if not provided).
+Review the diff of the current branch against main (run `git diff origin/main...HEAD` if not provided).
 Act as a strict senior engineer. Skip minor style issues. Focus on:
 
 - **Bugs** — logic errors, off-by-ones, incorrect assumptions
@@ -92,6 +92,9 @@ Prefer: pure functions, separated business logic and I/O, injectable dependencie
 - 🟢 Optimization Opportunities
 - 📝 Improved Code Snippets
 - ⚖️ Final Verdict — is this PR ready to merge? Does it fulfill the scope of its Build Order step?
+  This section must be the last section in the report. End it with exactly one of these two lines:
+  `VERDICT: READY TO MERGE`
+  `VERDICT: NOT READY TO MERGE`
 
 ---
 
