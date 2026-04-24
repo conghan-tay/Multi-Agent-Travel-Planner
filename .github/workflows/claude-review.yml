@@ -13,6 +13,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      issues: write
 
     steps:
       - name: Checkout code
@@ -26,14 +27,17 @@ jobs:
           python-version: "3.11"
 
       - name: Install Claude Code
-        run: npm install -g @anthropic-ai/claude-code
+        run: npm install -g @anthropic-ai/claude-code@1
 
       - name: Run Claude Code Review
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CI_REVIEW: "true"
+          HEAD_REF: ${{ github.head_ref }}
         run: |
-          BRANCH="${{ github.head_ref }}"
+          set -euo pipefail
+
+          BRANCH="$HEAD_REF"
           BRANCH=$(printf '%s' "$BRANCH" | tr -cs '[:alnum:]._-' '-' | sed 's/^-//;s/-$//')
           if [ -z "$BRANCH" ]; then
             echo "Could not resolve PR head branch name"
@@ -65,59 +69,45 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          REPORT_FILE="${{ env.REPORT_FILE }}"
+          set -euo pipefail
 
-          # Check if report exists
           if [ ! -f "$REPORT_FILE" ]; then
-            echo "Report file not found"
+            echo "Report file not found: $REPORT_FILE"
             exit 1
           fi
 
-          # Extract must-fix section
-          MUST_FIX=$(awk '/🔴 Must-Fix Items/,/🟡 Recommended Refactors/' "$REPORT_FILE" \
-            | grep -v '🟡 Recommended Refactors' \
-            | grep -v '🔴 Must-Fix Items' \
-            | sed '/^$/d')
+          MUST_FIX=$(python3 scripts/extract_must_fix.py "$REPORT_FILE")
 
           HAS_MUST_FIX=false
-          if [ -n "$MUST_FIX" ]; then
-            HAS_MUST_FIX=true
-          fi
+          [ -n "$MUST_FIX" ] && HAS_MUST_FIX=true
 
           PR_NUMBER="${{ github.event.pull_request.number }}"
-
-          # Build artifact URL
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          # Build comment body
           if [ "$HAS_MUST_FIX" = "true" ]; then
             HEADER="## 🔴 Claude Code Review — Must-Fix Items Found"
           else
             HEADER="## ✅ Claude Code Review — No Must-Fix Items"
           fi
 
-          COMMENT="${HEADER}
+          COMMENT=$(cat <<EOF
+            ${HEADER}
 
-          ${MUST_FIX}
+            ${MUST_FIX}
 
-          ---
-          📄 [Download full report](${RUN_URL}) (available under **Artifacts** on the Actions run page)
-          "
+            ---
+            📄 [Download full report](${RUN_URL}) (available under **Artifacts** on the Actions run page)
+            EOF
+          )
 
-          # Post comment on PR
           gh pr comment "$PR_NUMBER" --body "$COMMENT"
 
-          # Add blocked label if must-fix items exist
           if [ "$HAS_MUST_FIX" = "true" ]; then
-            # Create label if it doesn't exist
             gh label create "blocked" \
               --color "B60205" \
               --description "PR has must-fix items from code review" \
               2>/dev/null || true
-
             gh pr edit "$PR_NUMBER" --add-label "blocked"
-            echo "Blocked label added to PR #${PR_NUMBER}"
           else
-            # Remove blocked label if a previous review had added it
             gh pr edit "$PR_NUMBER" --remove-label "blocked" 2>/dev/null || true
           fi
