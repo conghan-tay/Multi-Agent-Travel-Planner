@@ -1,0 +1,109 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types:
+      - labeled
+
+jobs:
+  review:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.label.name == 'for-review'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Claude Code
+        run: curl -fsSL https://claude.ai/install.sh | bash
+
+      - name: Run Claude Code Review
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          CI_REVIEW: "true"
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+
+          BRANCH="$HEAD_REF"
+          BRANCH=$(printf '%s' "$BRANCH" | tr -cs '[:alnum:]._-' '-' | sed 's/^-//;s/-$//')
+          if [ -z "$BRANCH" ]; then
+            echo "Could not resolve PR head branch name"
+            exit 1
+          fi
+
+          DATE=$(date +%Y-%m-%d)
+          REPORT_FILE="review_${BRANCH}_${DATE}.md"
+
+          claude -p --permission-mode acceptEdits \
+            "perform a code review of the current branch. \
+             Write the report to ${REPORT_FILE}."
+
+          if [ ! -f "$REPORT_FILE" ]; then
+            echo "Claude did not generate report file: ${REPORT_FILE}"
+            exit 1
+          fi
+
+          echo "REPORT_FILE=${REPORT_FILE}" >> $GITHUB_ENV
+
+      - name: Upload report as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-review-report
+          path: ${{ env.REPORT_FILE }}
+          retention-days: 30
+
+      - name: Post verdict comment and apply label
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ ! -f "$REPORT_FILE" ]; then
+            echo "Report file not found: $REPORT_FILE"
+            exit 1
+          fi
+
+          VERDICT_SECTION=$(python3 scripts/extract_must_fix.py "$REPORT_FILE")
+
+          NEEDS_BLOCK=false
+          [ -n "$VERDICT_SECTION" ] && NEEDS_BLOCK=true
+
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          if [ "$NEEDS_BLOCK" = "true" ]; then
+            HEADER="## 🔴 Claude Code Review — Not Ready to Merge"
+          else
+            HEADER="## ✅ Claude Code Review — Ready to Merge"
+          fi
+
+          COMMENT="${HEADER}
+
+          ${VERDICT_SECTION}
+
+          ---
+          📄 [Download full report](${RUN_URL}) (available under **Artifacts** on the Actions run page)"
+
+          gh pr comment "$PR_NUMBER" --body "$COMMENT"
+
+          if [ "$NEEDS_BLOCK" = "true" ]; then
+            gh label create "blocked" \
+              --color "B60205" \
+              --description "PR has must-fix items from code review" \
+              2>/dev/null || true
+            gh pr edit "$PR_NUMBER" --add-label "blocked"
+          else
+            gh pr edit "$PR_NUMBER" --remove-label "blocked" 2>/dev/null || true
+          fi

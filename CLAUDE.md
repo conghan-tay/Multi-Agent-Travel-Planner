@@ -29,14 +29,24 @@ and read all results before proceeding.
 After reading them, confirm:
 1. What the project does
 2. The Recommended Build Order (from the PRD)
-3. Ask the user: which step of the Recommended Build Order is the current PR/branch for?
+3. Determine the build step as follows:
+   - If the env var `CI_REVIEW` is set to `true`, or `CI` is set to `true`, do not ask. Instead:
+     - Inspect the changed files from `git diff origin/main...HEAD --name-only`
+     - If the changes map clearly to a step in the Recommended Build Order, state which step and proceed
+     - If the changes are outside the Recommended Build Order (e.g. CI/CD config, tooling,
+       infrastructure, GitHub Actions workflows, documentation), state that explicitly:
+       "This PR appears to be an infrastructure/tooling addition outside the Recommended Build Order.
+       Reviewing against general engineering standards rather than a specific build step."
+       Then proceed with the review using that framing.
+   - If neither `CI_REVIEW=true` nor `CI=true`, ask the user which step of the Recommended Build Order
+     this PR is for before proceeding.
 
-Do not begin the review until you have this context.
+Do not begin the review until step 3 is resolved.
 
 ---
 
 ### Step 2: Code Review
-Review the diff of the current branch against main (run `git diff main...HEAD` if not provided).
+Review the diff of the current branch against main (run `git diff origin/main...HEAD` if not provided).
 Act as a strict senior engineer. Skip minor style issues. Focus on:
 
 - **Bugs** — logic errors, off-by-ones, incorrect assumptions
@@ -82,12 +92,19 @@ Prefer: pure functions, separated business logic and I/O, injectable dependencie
 - 🟢 Optimization Opportunities
 - 📝 Improved Code Snippets
 - ⚖️ Final Verdict — is this PR ready to merge? Does it fulfill the scope of its Build Order step?
+  This section must be the last section in the report. End it with exactly one of these two lines:
+  `VERDICT: READY TO MERGE`
+  `VERDICT: NOT READY TO MERGE`
 
 ---
 
 ### Output
-After completing the full review, write the report to a file in the project root:
-- Filename: `review_<branch-name>_<YYYY-MM-DD>.md`  
-  (get branch name by running `git rev-parse --abbrev-ref HEAD` and date from `date +%Y-%m-%d`)
+After completing the full review, write the report to the **current working directory**:
+- Use a relative path only (e.g. `./review_feature-auth_2026-04-24.md`)
+- Never use an absolute path
+- Use the filename provided by the caller if one is specified
+- If no filename is provided, derive it by running `git rev-parse --abbrev-ref HEAD`
+  for the branch name and `date +%Y-%m-%d` for today's date,
+  then write to `./review_<branch-name>_<YYYY-MM-DD>.md`
 - Do not truncate any section. Write the full report including all issues, snippets, and the final verdict.
-- After writing, confirm the filename to the user.
+- After writing, confirm the filename and its full resolved path to the user.
