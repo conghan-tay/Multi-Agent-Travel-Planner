@@ -1,18 +1,18 @@
 name: Claude Code Review
 
 on:
-  push:
-    branches-ignore:
+  pull_request:
+    branches:
       - main
-      - master
 
 jobs:
   review:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       pull-requests: write
-      issues: write
 
     steps:
       - name: Checkout code
@@ -32,11 +32,11 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          BRANCH=$(git rev-parse --abbrev-ref HEAD | tr -cs '[:alnum:]._-' '-' | sed 's/^-//;s/-$//')
           DATE=$(date +%Y-%m-%d)
-          REPORT_FILE="review_${BRANCH//\//-}_${DATE}.md"
+          REPORT_FILE="review_${BRANCH}_${DATE}.md"
 
-          claude --dangerously-skip-permissions \
+          claude \
             "perform a code review of the current branch. \
              Write the report to ${REPORT_FILE}."
 
@@ -64,10 +64,11 @@ jobs:
           # Extract must-fix section
           MUST_FIX=$(awk '/🔴 Must-Fix Items/,/🟡 Recommended Refactors/' "$REPORT_FILE" \
             | grep -v '🟡 Recommended Refactors' \
+            | grep -v '🔴 Must-Fix Items' \
             | sed '/^$/d')
 
           HAS_MUST_FIX=false
-          if echo "$MUST_FIX" | grep -qv '^\s*$'; then
+          if [ -n "$MUST_FIX" ]; then
             HAS_MUST_FIX=true
           fi
 
