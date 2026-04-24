@@ -29,9 +29,19 @@ and read all results before proceeding.
 After reading them, confirm:
 1. What the project does
 2. The Recommended Build Order (from the PRD)
-3. Ask the user: which step of the Recommended Build Order is the current PR/branch for?
+3. Determine the build step as follows:
+   - If the env var `CI_REVIEW` is set to `true`, or `CI` is set to `true`, do not ask. Instead:
+     - Inspect the changed files from `git diff main...HEAD --name-only`
+     - If the changes map clearly to a step in the Recommended Build Order, state which step and proceed
+     - If the changes are outside the Recommended Build Order (e.g. CI/CD config, tooling,
+       infrastructure, GitHub Actions workflows, documentation), state that explicitly:
+       "This PR appears to be an infrastructure/tooling addition outside the Recommended Build Order.
+       Reviewing against general engineering standards rather than a specific build step."
+       Then proceed with the review using that framing.
+   - If neither `CI_REVIEW=true` nor `CI=true`, ask the user which step of the Recommended Build Order
+     this PR is for before proceeding.
 
-Do not begin the review until you have this context.
+Do not begin the review until step 3 is resolved.
 
 ---
 
