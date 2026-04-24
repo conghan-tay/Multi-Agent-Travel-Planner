@@ -2,12 +2,12 @@ name: Claude Code Review
 
 on:
   pull_request:
-    branches:
-      - main
+    types:
+      - labeled
 
 jobs:
   review:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.label.name == 'for-review'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
