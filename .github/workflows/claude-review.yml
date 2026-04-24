@@ -32,13 +32,24 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          BRANCH=$(git rev-parse --abbrev-ref HEAD | tr -cs '[:alnum:]._-' '-' | sed 's/^-//;s/-$//')
+          BRANCH="${{ github.head_ref }}"
+          BRANCH=$(printf '%s' "$BRANCH" | tr -cs '[:alnum:]._-' '-' | sed 's/^-//;s/-$//')
+          if [ -z "$BRANCH" ]; then
+            echo "Could not resolve PR head branch name"
+            exit 1
+          fi
+
           DATE=$(date +%Y-%m-%d)
           REPORT_FILE="review_${BRANCH}_${DATE}.md"
 
-          claude \
+          claude -p --permission-mode acceptEdits \
             "perform a code review of the current branch. \
              Write the report to ${REPORT_FILE}."
+
+          if [ ! -f "$REPORT_FILE" ]; then
+            echo "Claude did not generate report file: ${REPORT_FILE}"
+            exit 1
+          fi
 
           echo "REPORT_FILE=${REPORT_FILE}" >> $GITHUB_ENV
 
@@ -72,16 +83,7 @@ jobs:
             HAS_MUST_FIX=true
           fi
 
-          # Get PR number for this branch
-          PR_NUMBER=$(gh pr list \
-            --head "${{ github.ref_name }}" \
-            --json number \
-            --jq '.[0].number')
-
-          if [ -z "$PR_NUMBER" ]; then
-            echo "No open PR found for this branch — skipping comment"
-            exit 0
-          fi
+          PR_NUMBER="${{ github.event.pull_request.number }}"
 
           # Build artifact URL
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
