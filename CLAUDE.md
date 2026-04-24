@@ -86,8 +86,12 @@ Prefer: pure functions, separated business logic and I/O, injectable dependencie
 ---
 
 ### Output
-After completing the full review, write the report to a file in the project root:
-- Filename: `review_<branch-name>_<YYYY-MM-DD>.md`  
-  (get branch name by running `git rev-parse --abbrev-ref HEAD` and date from `date +%Y-%m-%d`)
+After completing the full review, write the report to the **current working directory**:
+- Use a relative path only (e.g. `./review_feature-auth_2026-04-24.md`)
+- Never use an absolute path
+- Use the filename provided by the caller if one is specified
+- If no filename is provided, derive it by running `git rev-parse --abbrev-ref HEAD`
+  for the branch name and `date +%Y-%m-%d` for today's date,
+  then write to `./review_<branch-name>_<YYYY-MM-DD>.md`
 - Do not truncate any section. Write the full report including all issues, snippets, and the final verdict.
-- After writing, confirm the filename to the user.
+- After writing, confirm the filename and its full resolved path to the user.

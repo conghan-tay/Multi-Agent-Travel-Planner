@@ -1,0 +1,119 @@
+name: Claude Code Review
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - master
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run Claude Code Review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          DATE=$(date +%Y-%m-%d)
+          REPORT_FILE="review_${BRANCH//\//-}_${DATE}.md"
+
+          claude --dangerously-skip-permissions \
+            "perform a code review of the current branch. \
+             Write the report to ${REPORT_FILE}."
+
+          echo "REPORT_FILE=${REPORT_FILE}" >> $GITHUB_ENV
+
+      - name: Upload report as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-review-report
+          path: ${{ env.REPORT_FILE }}
+          retention-days: 30
+
+      - name: Extract must-fix items and post PR comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPORT_FILE="${{ env.REPORT_FILE }}"
+
+          # Check if report exists
+          if [ ! -f "$REPORT_FILE" ]; then
+            echo "Report file not found"
+            exit 1
+          fi
+
+          # Extract must-fix section
+          MUST_FIX=$(awk '/🔴 Must-Fix Items/,/🟡 Recommended Refactors/' "$REPORT_FILE" \
+            | grep -v '🟡 Recommended Refactors' \
+            | sed '/^$/d')
+
+          HAS_MUST_FIX=false
+          if echo "$MUST_FIX" | grep -qv '^\s*$'; then
+            HAS_MUST_FIX=true
+          fi
+
+          # Get PR number for this branch
+          PR_NUMBER=$(gh pr list \
+            --head "${{ github.ref_name }}" \
+            --json number \
+            --jq '.[0].number')
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No open PR found for this branch — skipping comment"
+            exit 0
+          fi
+
+          # Build artifact URL
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          # Build comment body
+          if [ "$HAS_MUST_FIX" = "true" ]; then
+            HEADER="## 🔴 Claude Code Review — Must-Fix Items Found"
+          else
+            HEADER="## ✅ Claude Code Review — No Must-Fix Items"
+          fi
+
+          COMMENT="${HEADER}
+
+          ${MUST_FIX}
+
+          ---
+          📄 [Download full report](${RUN_URL}) (available under **Artifacts** on the Actions run page)
+          "
+
+          # Post comment on PR
+          gh pr comment "$PR_NUMBER" --body "$COMMENT"
+
+          # Add blocked label if must-fix items exist
+          if [ "$HAS_MUST_FIX" = "true" ]; then
+            # Create label if it doesn't exist
+            gh label create "blocked" \
+              --color "B60205" \
+              --description "PR has must-fix items from code review" \
+              2>/dev/null || true
+
+            gh pr edit "$PR_NUMBER" --add-label "blocked"
+            echo "Blocked label added to PR #${PR_NUMBER}"
+          else
+            # Remove blocked label if a previous review had added it
+            gh pr edit "$PR_NUMBER" --remove-label "blocked" 2>/dev/null || true
+          fi
