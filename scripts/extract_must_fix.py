@@ -13,10 +13,21 @@ import pathlib
 
 def extract_must_fix(content: str) -> str:
     start = content.find("🔴 Must-Fix Items")
-    end = content.find("🟡 Recommended Refactors")
-
-    if start == -1 or end == -1:
+    if start == -1:
         return ""
+
+    next_section_markers = [
+        "🟡 Recommended Refactors",
+        "🟢 Optimization",
+        "📝 Improved",
+        "⚖️ Final Verdict",
+        "## ",
+    ]
+    end = len(content)
+    for marker in next_section_markers:
+        pos = content.find(marker, start + 1)
+        if pos != -1 and pos < end:
+            end = pos
 
     section = content[start:end]
     lines = [

@@ -89,15 +89,12 @@ jobs:
             HEADER="## ✅ Claude Code Review — No Must-Fix Items"
           fi
 
-          COMMENT=$(cat <<EOF
-            ${HEADER}
+          COMMENT="${HEADER}
 
-            ${MUST_FIX}
+          ${MUST_FIX}
 
-            ---
-            📄 [Download full report](${RUN_URL}) (available under **Artifacts** on the Actions run page)
-            EOF
-          )
+          ---
+          📄 [Download full report](${RUN_URL}) (available under **Artifacts** on the Actions run page)"
 
           gh pr comment "$PR_NUMBER" --body "$COMMENT"
 
