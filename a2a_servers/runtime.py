@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
+import logging
 import os
+import threading
+from collections.abc import Awaitable
 from dataclasses import dataclass
 from typing import Callable
 
@@ -22,6 +26,8 @@ from dotenv import load_dotenv
 SPECIALIST_TOOL_NAME = "run_specialist"
 AGENT_CARD_PATH = "/.well-known/agent-card.json"
 JSONRPC_PATH = "/a2a"
+SpecialistRunner = Callable[[str], Awaitable[str]]
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -43,18 +49,58 @@ def _resolve_adapter_model() -> str:
     return os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 
-def _build_run_specialist_tool(runner: Callable[[str], str]):
+def _format_runner_error(exc: Exception) -> str:
+    return f"Specialist execution failed. {type(exc).__name__}: {exc}"
+
+
+def _run_async_runner(runner: SpecialistRunner, user_request: str) -> str:
+    """Run an async specialist runner from CrewAI's synchronous tool call path."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(runner(user_request))
+
+    result: str | None = None
+    error: BaseException | None = None
+
+    def worker() -> None:
+        nonlocal result, error
+        try:
+            result = asyncio.run(runner(user_request))
+        except BaseException as exc:  # noqa: BLE001
+            error = exc
+
+    thread = threading.Thread(target=worker, daemon=True)
+    thread.start()
+    thread.join()
+
+    if error is not None:
+        raise error
+    if result is None:
+        raise RuntimeError("Specialist runner completed without returning a result")
+    return result
+
+
+def _build_run_specialist_tool(runner: SpecialistRunner):
     @tool(SPECIALIST_TOOL_NAME)
     def run_specialist(user_request: str) -> str:
         """Execute the wrapped specialist crew for one user request."""
-        return runner(user_request)
+        try:
+            return _run_async_runner(runner, user_request)
+        except Exception as exc:
+            logger.exception(
+                "Specialist runner failed for request=%r: %s",
+                user_request,
+                exc,
+            )
+            return _format_runner_error(exc)
 
     return run_specialist
 
 
 def build_adapter_agent(
     spec: SpecialistServerSpec,
-    runner: Callable[[str], str],
+    runner: SpecialistRunner,
 ) -> Agent:
     """Create an adapter agent with A2A server metadata."""
     run_specialist_tool = _build_run_specialist_tool(runner)
@@ -95,7 +141,7 @@ class CrewAIA2AExecutorBridge(A2AAgentExecutor):
 
 def build_app(
     spec: SpecialistServerSpec,
-    runner: Callable[[str], str],
+    runner: SpecialistRunner,
     host: str = "127.0.0.1",
     port: int | None = None,
 ):
@@ -142,7 +188,7 @@ def run_server(app, host: str, port: int, log_level: str) -> None:
 
 def run_specialist_server(
     spec: SpecialistServerSpec,
-    runner: Callable[[str], str],
+    runner: SpecialistRunner,
     argv: list[str] | None = None,
     program_name: str | None = None,
 ) -> None:

@@ -28,8 +28,8 @@ SPEC = SpecialistServerSpec(
 )
 
 
-def run_scout_specialist(user_request: str) -> str:
-    return FlightHotelScoutCrew(verbose=False).run(user_request)
+async def run_scout_specialist(user_request: str) -> str:
+    return await FlightHotelScoutCrew(verbose=False).run_async(user_request)
 
 
 def make_app():
