@@ -6,7 +6,7 @@ import sys
 from crewai.a2a.config import A2AClientConfig
 
 from agents.orchestrator import crew as mod
-from agents.orchestrator.crew import TravelOrchestratorCrew
+from agents.orchestrator.crew import OrchestratorConfig, TravelOrchestratorCrew
 
 
 class FakeCrew:
@@ -20,18 +20,26 @@ class FakeCrew:
 
 
 def test_orchestrator_configures_three_a2a_clients(monkeypatch):
-    monkeypatch.setenv("LLM_PROVIDER", "openai")
     monkeypatch.setattr(mod, "Crew", FakeCrew)
-    orchestrator = TravelOrchestratorCrew(verbose=True)
+    config = OrchestratorConfig(
+        llm_model="gpt-test",
+        a2a_endpoints=(
+            "http://127.0.0.1:9101/.well-known/agent-card.json",
+            "http://127.0.0.1:9102/.well-known/agent-card.json",
+            "http://127.0.0.1:9103/.well-known/agent-card.json",
+        ),
+    )
+    orchestrator = TravelOrchestratorCrew(verbose=True, config=config)
     agent = orchestrator.crew.agents[0]
 
     assert agent.verbose is True
+    assert orchestrator.llm_model == "gpt-test"
     assert len(agent.a2a) == 3
     assert all(isinstance(config, A2AClientConfig) for config in agent.a2a)
     assert [config.endpoint for config in agent.a2a] == [
-        mod.ITINERARY_AGENT_CARD_URL,
-        mod.SCOUT_AGENT_CARD_URL,
-        mod.BUDGET_AGENT_CARD_URL,
+        "http://127.0.0.1:9101/.well-known/agent-card.json",
+        "http://127.0.0.1:9102/.well-known/agent-card.json",
+        "http://127.0.0.1:9103/.well-known/agent-card.json",
     ]
 
 
@@ -52,9 +60,13 @@ def test_orchestrator_module_does_not_import_specialist_crews(monkeypatch):
 
 
 def test_orchestrator_prompt_requires_a2a_delegation(monkeypatch):
-    monkeypatch.setenv("LLM_PROVIDER", "openai")
     monkeypatch.setattr(mod, "Crew", FakeCrew)
-    orchestrator = TravelOrchestratorCrew()
+    orchestrator = TravelOrchestratorCrew(
+        config=OrchestratorConfig(
+            llm_model="gpt-test",
+            a2a_endpoints=mod.DEFAULT_A2A_ENDPOINTS,
+        )
+    )
     agent = orchestrator.crew.agents[0]
     task = orchestrator.crew.tasks[0]
 
@@ -66,7 +78,6 @@ def test_orchestrator_prompt_requires_a2a_delegation(monkeypatch):
 
 
 def test_orchestrator_run_kicks_off_with_user_request(monkeypatch):
-    monkeypatch.setenv("LLM_PROVIDER", "openai")
     monkeypatch.setattr(mod, "Crew", FakeCrew)
     calls: list[dict[str, str]] = []
 
@@ -75,8 +86,48 @@ def test_orchestrator_run_kicks_off_with_user_request(monkeypatch):
             calls.append(inputs)
             return "orchestrated output"
 
-    orchestrator = TravelOrchestratorCrew()
+    orchestrator = TravelOrchestratorCrew(
+        config=OrchestratorConfig(
+            llm_model="gpt-test",
+            a2a_endpoints=mod.DEFAULT_A2A_ENDPOINTS,
+        )
+    )
     orchestrator.crew = DummyCrew()
 
     assert orchestrator.run("Plan Tokyo") == "orchestrated output"
     assert calls == [{"user_request": "Plan Tokyo"}]
+
+
+def test_orchestrator_config_from_env_respects_monkeypatch(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-env-test")
+
+    config = OrchestratorConfig.from_env()
+
+    assert config.llm_model == "gpt-env-test"
+    assert config.a2a_endpoints == mod.DEFAULT_A2A_ENDPOINTS
+
+
+def test_build_a2a_client_configs_uses_configured_endpoints():
+    endpoints = (
+        "http://127.0.0.1:9201/.well-known/agent-card.json",
+        "http://127.0.0.1:9202/.well-known/agent-card.json",
+        "http://127.0.0.1:9203/.well-known/agent-card.json",
+    )
+
+    configs = mod.build_a2a_client_configs(endpoints)
+
+    assert [config.endpoint for config in configs] == list(endpoints)
+
+
+def test_orchestrator_constructor_has_no_dotenv_side_effect(monkeypatch):
+    monkeypatch.setattr(mod, "Crew", FakeCrew)
+    assert not hasattr(mod, "load_dotenv")
+
+    config = OrchestratorConfig(
+        llm_model="gpt-explicit",
+        a2a_endpoints=mod.DEFAULT_A2A_ENDPOINTS,
+    )
+    orchestrator = TravelOrchestratorCrew(config=config)
+
+    assert orchestrator.llm_model == "gpt-explicit"

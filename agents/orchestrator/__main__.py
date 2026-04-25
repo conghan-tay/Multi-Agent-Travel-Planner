@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import sys
 
+from dotenv import load_dotenv
+
 from .crew import TravelOrchestratorCrew
 
 
@@ -23,6 +25,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    load_dotenv(override=False)
     args = parse_args()
     try:
         output = TravelOrchestratorCrew(verbose=args.verbose).run(args.request)

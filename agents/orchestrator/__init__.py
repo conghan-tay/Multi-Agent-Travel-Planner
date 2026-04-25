@@ -1,5 +1,5 @@
 """Step 6: Travel orchestrator A2A client."""
 
-from .crew import TravelOrchestratorCrew
+from .crew import OrchestratorConfig, TravelOrchestratorCrew
 
-__all__ = ["TravelOrchestratorCrew"]
+__all__ = ["OrchestratorConfig", "TravelOrchestratorCrew"]

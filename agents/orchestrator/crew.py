@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 
 from crewai import Agent, Crew, Process, Task
 from crewai.a2a.config import A2AClientConfig
-from dotenv import load_dotenv
 
 ITINERARY_AGENT_CARD_URL = "http://127.0.0.1:9001/.well-known/agent-card.json"
 SCOUT_AGENT_CARD_URL = "http://127.0.0.1:9002/.well-known/agent-card.json"
 BUDGET_AGENT_CARD_URL = "http://127.0.0.1:9003/.well-known/agent-card.json"
+DEFAULT_A2A_ENDPOINTS = (
+    ITINERARY_AGENT_CARD_URL,
+    SCOUT_AGENT_CARD_URL,
+    BUDGET_AGENT_CARD_URL,
+)
 
 
 def _resolve_llm_model() -> str:
@@ -32,23 +37,40 @@ def _resolve_llm_model() -> str:
     )
 
 
-def build_a2a_client_configs() -> list[A2AClientConfig]:
+@dataclass(frozen=True)
+class OrchestratorConfig:
+    """Runtime configuration for the travel orchestrator."""
+
+    llm_model: str
+    a2a_endpoints: tuple[str, str, str]
+
+    @classmethod
+    def from_env(cls) -> "OrchestratorConfig":
+        return cls(
+            llm_model=_resolve_llm_model(),
+            a2a_endpoints=DEFAULT_A2A_ENDPOINTS,
+        )
+
+
+def build_a2a_client_configs(
+    endpoints: tuple[str, str, str],
+) -> list[A2AClientConfig]:
     """Build the specialist A2A client configs used by the orchestrator."""
     return [
         A2AClientConfig(
-            endpoint=ITINERARY_AGENT_CARD_URL,
+            endpoint=endpoints[0],
             timeout=180,
             max_turns=3,
             accepted_output_modes=["text/plain", "application/json"],
         ),
         A2AClientConfig(
-            endpoint=SCOUT_AGENT_CARD_URL,
+            endpoint=endpoints[1],
             timeout=180,
             max_turns=3,
             accepted_output_modes=["text/plain", "application/json"],
         ),
         A2AClientConfig(
-            endpoint=BUDGET_AGENT_CARD_URL,
+            endpoint=endpoints[2],
             timeout=180,
             max_turns=3,
             accepted_output_modes=["text/plain", "application/json"],
@@ -59,10 +81,14 @@ def build_a2a_client_configs() -> list[A2AClientConfig]:
 class TravelOrchestratorCrew:
     """Root travel planner that routes requests to remote A2A specialists."""
 
-    def __init__(self, verbose: bool = False):
-        load_dotenv(override=True)
+    def __init__(
+        self,
+        verbose: bool = False,
+        config: OrchestratorConfig | None = None,
+    ):
         self.verbose = verbose
-        self.llm_model = _resolve_llm_model()
+        self.config = config or OrchestratorConfig.from_env()
+        self.llm_model = self.config.llm_model
         self.crew = self._build_crew()
 
     def _build_crew(self) -> Crew:
@@ -81,7 +107,7 @@ class TravelOrchestratorCrew:
             ),
             llm=self.llm_model,
             verbose=self.verbose,
-            a2a=build_a2a_client_configs(),
+            a2a=build_a2a_client_configs(self.config.a2a_endpoints),
         )
 
         route_request_task = Task(
