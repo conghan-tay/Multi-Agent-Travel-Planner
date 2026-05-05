@@ -112,7 +112,7 @@ Switching between OpenAI and Anthropic requires only changing `LLM_PROVIDER` —
 
 ## Running the system
 
-Current implemented runtime scope is **Step 1 + Step 5** (tool servers + itinerary + scout + budget specialists + A2A specialist servers).
+Current implemented runtime scope is **Step 1 through Step 6** (tool servers, direct specialist crews, specialist A2A servers, and the A2A orchestrator CLI).
 
 ### Step 1 — Seed the database (first run only)
 
@@ -171,6 +171,27 @@ curl http://localhost:9003/.well-known/agent-card.json | python3 -m json.tool
 ```
 
 For full delegation behavior, tool servers must also be running (`make start-tools`).
+
+### Step 8 — Run the Travel Orchestrator (Step 6)
+
+Prerequisites:
+- `make start-tools`
+- `make start-agents`
+
+One-shot mode:
+
+```bash
+python main.py "Plan a 5-day trip to Tokyo for two people"
+python main.py "Find flights and hotels from NYC to Tokyo for Oct 1 to Oct 8 for 2 travelers" --verbose
+```
+
+Interactive mode:
+
+```bash
+python main.py
+```
+
+The orchestrator fetches the specialist Agent Cards and delegates via A2A. It does not import specialist crew code directly.
 
 ### A2A Prompt Test Harness
 
@@ -231,7 +252,7 @@ python -m agents.budget 'Optimize this package under $3000. Route: NYC to Tokyo.
 
 Use `--verbose` to see the CrewAI task/tool trace.
 
-Planned (not yet implemented): orchestrator CLI (`main.py`), cooldown guard, and session-state routing flow.
+Planned (not yet implemented): cooldown guard and session-state routing flow.
 
 ---
 
@@ -283,7 +304,7 @@ crewai-mas/
 
 ---
 
-## Quickstart: Verify Implemented Scope (Step 1 + Step 5)
+## Quickstart: Verify Implemented Scope (Step 1 + Step 6)
 
 Use this section as the source of truth for setup and command order.
 
@@ -332,6 +353,9 @@ python -m agents.budget 'Optimize this package under $3000. Route: NYC to Tokyo.
 # Step 5 check (A2A specialist servers + Agent Cards)
 make start-agents
 make verify-agent-cards
+
+# Step 6 check (A2A orchestrator)
+python main.py "Plan a 5-day trip to Tokyo for two people" --verbose
 ```
 
 ### Subsequent runs (new terminal)
@@ -341,6 +365,7 @@ cd /Users/conghantay/Desktop/Contract/MultiAgentSystem
 source .venv/bin/activate
 make start-tools
 make start-agents
+python main.py "Plan a 5-day trip to Tokyo for two people" --verbose
 python -m agents.itinerary "Plan a 5-day trip to Paris in October for 2 people" --verbose
 python -m agents.scout "Find flights and hotels from NYC to Tokyo for Oct 1 to Oct 8 for 2 travelers" --verbose
 python -m agents.budget 'Optimize this package under $3000. Route: NYC to Tokyo. Flight: $900 per traveler. Hotel: $1400 total. Dates: 2026-10-01 to 2026-10-08 for 2 travelers.' --verbose

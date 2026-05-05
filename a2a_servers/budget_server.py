@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from a2a.types import AgentSkill
 from dotenv import load_dotenv
 
@@ -28,8 +30,10 @@ SPEC = SpecialistServerSpec(
 )
 
 
-def run_budget_specialist(user_request: str) -> str:
-    return BudgetOptimizerCrew(verbose=False).run(user_request)
+async def run_budget_specialist(user_request: str) -> str:
+    return await asyncio.to_thread(
+        lambda: BudgetOptimizerCrew(verbose=False).run(user_request)
+    )
 
 
 def make_app():

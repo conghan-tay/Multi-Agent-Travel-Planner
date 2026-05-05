@@ -143,9 +143,9 @@ class BudgetOptimizerFlow(Flow[BudgetOptimizerState]):
     _skip_auto_memory = True
 
     def __init__(self, llm_model: str, verbose: bool = False):
-        self.llm_model = llm_model
-        self.verbose = verbose
         super().__init__()
+        object.__setattr__(self, "llm_model", llm_model)
+        object.__setattr__(self, "verbose", verbose)
 
     @start()
     def initialize(self) -> str:
