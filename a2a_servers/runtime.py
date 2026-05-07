@@ -36,7 +36,6 @@ logger = logging.getLogger(__name__)
 _cooldown_guard = CooldownGuard()
 _cooldown_hook_registered = False
 _cooldown_hook_lock = threading.Lock()
-_adapter_tool_specialists: dict[int, str] = {}
 
 
 @dataclass(frozen=True)
@@ -90,16 +89,28 @@ def _extract_cooldown_sentinel(user_request: str) -> str | None:
 
 
 def _before_adapter_tool_call(context: ToolCallHookContext) -> bool | None:
-    """Apply cooldown only to registered A2A adapter tools."""
+    """Apply cooldown only to A2A adapter agents."""
     if context.tool_name != SPECIALIST_TOOL_NAME:
         return None
 
-    specialist_id = _adapter_tool_specialists.get(id(context.tool))
+    specialist_id = getattr(context.agent, "_specialist_id", None)
     if specialist_id is None:
+        diagnostic_message = (
+            "cooldown hook skipped run_specialist call without "
+            f"adapter specialist metadata agent_role={getattr(context.agent, 'role', None)!r}"
+        )
+        logger.warning(diagnostic_message)
         return None
 
     _cooldown_guard.cooldown_seconds = _resolve_cooldown_seconds()
     decision = _cooldown_guard.check_and_mark(specialist_id)
+    diagnostic_message = (
+        "cooldown check "
+        f"specialist_id={specialist_id} "
+        f"allowed={decision.allowed} "
+        f"remaining_seconds={decision.remaining_seconds}"
+    )
+    logger.warning(diagnostic_message)
     if decision.allowed:
         return None
 
@@ -124,15 +135,9 @@ def _ensure_cooldown_hook_registered() -> None:
         _cooldown_hook_registered = True
 
 
-def _register_adapter_cooldown_tool(tool_instance, specialist_id: str) -> None:
-    _ensure_cooldown_hook_registered()
-    _adapter_tool_specialists[id(tool_instance)] = specialist_id
-
-
 def reset_cooldown_state_for_tests() -> None:
     """Reset adapter cooldown state without unregistering the process-wide hook."""
     _cooldown_guard.reset()
-    _adapter_tool_specialists.clear()
 
 
 def _run_async_runner(runner: SpecialistRunner, user_request: str) -> str:
@@ -190,13 +195,13 @@ def build_adapter_agent(
 ) -> Agent:
     """Create an adapter agent with A2A server metadata."""
     run_specialist_tool = _build_run_specialist_tool(runner)
-    _register_adapter_cooldown_tool(run_specialist_tool, spec.specialist_id)
+    _ensure_cooldown_hook_registered()
     server_config = A2AServerConfig(
         name=spec.specialist_id,
         description=spec.description,
         skills=spec.skills,
     )
-    return Agent(
+    adapter_agent = Agent(
         role=f"{spec.display_name} Adapter",
         goal=(
             "Handle one delegated user request by calling run_specialist exactly once "
@@ -211,6 +216,8 @@ def build_adapter_agent(
         verbose=False,
         a2a=server_config,
     )
+    setattr(adapter_agent, "_specialist_id", spec.specialist_id)
+    return adapter_agent
 
 
 class CrewAIA2AExecutorBridge(A2AAgentExecutor):

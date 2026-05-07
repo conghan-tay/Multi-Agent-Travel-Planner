@@ -163,6 +163,7 @@ def test_runtime_adapter_cooldown_hook_blocks_repeated_specialist(monkeypatch):
         tool_name=runtime.SPECIALIST_TOOL_NAME,
         tool_input=first_input,
         tool=tool,
+        agent=agent,
     )
     assert runtime._before_adapter_tool_call(first_context) is None
     assert tool.run(**first_input) == "async ok: hello"
@@ -172,6 +173,7 @@ def test_runtime_adapter_cooldown_hook_blocks_repeated_specialist(monkeypatch):
         tool_name=runtime.SPECIALIST_TOOL_NAME,
         tool_input=second_input,
         tool=tool,
+        agent=agent,
     )
     assert runtime._before_adapter_tool_call(second_context) is None
 
@@ -215,6 +217,7 @@ def test_runtime_adapter_cooldown_hook_tracks_specialists_independently(monkeypa
             tool_name=runtime.SPECIALIST_TOOL_NAME,
             tool_input=first_input,
             tool=first_agent.tools[0],
+            agent=first_agent,
         )
     )
     assert first_agent.tools[0].run(**first_input) == "async ok: first"
@@ -225,13 +228,14 @@ def test_runtime_adapter_cooldown_hook_tracks_specialists_independently(monkeypa
             tool_name=runtime.SPECIALIST_TOOL_NAME,
             tool_input=second_input,
             tool=second_agent.tools[0],
+            agent=second_agent,
         )
     )
     assert second_agent.tools[0].run(**second_input) == "async ok: second"
     assert calls == ["first", "second"]
 
 
-def test_runtime_adapter_cooldown_hook_ignores_unregistered_tools(monkeypatch):
+def test_runtime_adapter_cooldown_hook_ignores_run_specialist_without_adapter_metadata(monkeypatch):
     runtime.reset_cooldown_state_for_tests()
     monkeypatch.setenv("COOLDOWN_SECONDS", "60")
 
@@ -241,17 +245,62 @@ def test_runtime_adapter_cooldown_hook_ignores_unregistered_tools(monkeypatch):
 
     agent = runtime.build_adapter_agent(spec=_demo_spec(), runner=async_runner)
     tool = agent.tools[0]
-    runtime.reset_cooldown_state_for_tests()
+    delattr(agent, "_specialist_id")
 
     tool_input = {"user_request": "hello"}
     context = ToolCallHookContext(
         tool_name=runtime.SPECIALIST_TOOL_NAME,
         tool_input=tool_input,
         tool=tool,
+        agent=agent,
     )
 
     assert runtime._before_adapter_tool_call(context) is None
     assert tool_input == {"user_request": "hello"}
+
+
+def test_runtime_adapter_agent_has_specialist_id_metadata():
+    async def async_runner(user_request: str) -> str:
+        await asyncio.sleep(0)
+        return f"async ok: {user_request}"
+
+    agent = runtime.build_adapter_agent(spec=_demo_spec(), runner=async_runner)
+
+    assert getattr(agent, "_specialist_id") == "demo_specialist"
+
+
+def test_runtime_adapter_cooldown_hook_does_not_depend_on_tool_identity(monkeypatch):
+    runtime.reset_cooldown_state_for_tests()
+    monkeypatch.setenv("COOLDOWN_SECONDS", "60")
+
+    async def async_runner(user_request: str) -> str:
+        await asyncio.sleep(0)
+        return f"async ok: {user_request}"
+
+    agent = runtime.build_adapter_agent(spec=_demo_spec(), runner=async_runner)
+
+    first_input = {"user_request": "hello"}
+    runtime._before_adapter_tool_call(
+        ToolCallHookContext(
+            tool_name=runtime.SPECIALIST_TOOL_NAME,
+            tool_input=first_input,
+            tool=object(),
+            agent=agent,
+        )
+    )
+    assert first_input == {"user_request": "hello"}
+
+    second_input = {"user_request": "hello again"}
+    runtime._before_adapter_tool_call(
+        ToolCallHookContext(
+            tool_name=runtime.SPECIALIST_TOOL_NAME,
+            tool_input=second_input,
+            tool=object(),
+            agent=agent,
+        )
+    )
+
+    assert second_input["user_request"].startswith(runtime.COOLDOWN_SENTINEL_PREFIX)
 
 
 def test_runtime_adapter_cooldown_hook_ignores_non_specialist_tool_names(monkeypatch):
@@ -268,6 +317,7 @@ def test_runtime_adapter_cooldown_hook_ignores_non_specialist_tool_names(monkeyp
         tool_name="get_destination_info",
         tool_input=tool_input,
         tool=agent.tools[0],
+        agent=agent,
     )
 
     assert runtime._before_adapter_tool_call(context) is None
