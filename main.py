@@ -54,7 +54,7 @@ def _run_repl(verbose: bool) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    load_dotenv(override=True)
+    load_dotenv(override=False)
     args = parse_args(argv)
     if args.request:
         try:

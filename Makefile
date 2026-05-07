@@ -84,9 +84,10 @@ start-tools: install seed-db check-ports
 
 start-agents: install-agents check-agent-ports
 	@mkdir -p $(PID_DIR) $(LOG_DIR)
-	@nohup $(PYTHON) -m $(ITINERARY_A2A_SERVER) > $(LOG_DIR)/itinerary-a2a.log 2>&1 & echo $$! > $(ITINERARY_A2A_PID)
-	@nohup $(PYTHON) -m $(SCOUT_A2A_SERVER) > $(LOG_DIR)/scout-a2a.log 2>&1 & echo $$! > $(SCOUT_A2A_PID)
-	@nohup $(PYTHON) -m $(BUDGET_A2A_SERVER) > $(LOG_DIR)/budget-a2a.log 2>&1 & echo $$! > $(BUDGET_A2A_PID)
+	# to be removed: temporarily run A2A servers with debug logging for cooldown verification.
+	@nohup $(PYTHON) -m $(ITINERARY_A2A_SERVER) --log-level debug > $(LOG_DIR)/itinerary-a2a.log 2>&1 & echo $$! > $(ITINERARY_A2A_PID)
+	@nohup $(PYTHON) -m $(SCOUT_A2A_SERVER) --log-level debug > $(LOG_DIR)/scout-a2a.log 2>&1 & echo $$! > $(SCOUT_A2A_PID)
+	@nohup $(PYTHON) -m $(BUDGET_A2A_SERVER) --log-level debug > $(LOG_DIR)/budget-a2a.log 2>&1 & echo $$! > $(BUDGET_A2A_PID)
 	@echo "Started itinerary-a2a (PID $$(cat $(ITINERARY_A2A_PID))) on :9001"
 	@echo "Started scout-a2a (PID $$(cat $(SCOUT_A2A_PID))) on :9002"
 	@echo "Started budget-a2a (PID $$(cat $(BUDGET_A2A_PID))) on :9003"
