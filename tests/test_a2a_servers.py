@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from a2a.types import AgentSkill, Message, Part, TextPart
 from a2a_servers import budget_server, itinerary_server, runtime, scout_server
+from crewai.hooks.tool_hooks import ToolCallHookContext
 
 
 def test_itinerary_agent_card_metadata():
@@ -142,6 +143,185 @@ def test_runtime_adapter_tool_logs_runner_exception(caplog):
     assert result == "Specialist execution failed. RuntimeError: boom: bad request"
     assert "Specialist runner failed" in caplog.text
     assert "boom: bad request" in caplog.text
+
+
+def test_runtime_adapter_cooldown_hook_blocks_repeated_specialist(monkeypatch):
+    runtime.reset_cooldown_state_for_tests()
+    monkeypatch.setenv("COOLDOWN_SECONDS", "60")
+    calls: list[str] = []
+
+    async def async_runner(user_request: str) -> str:
+        await asyncio.sleep(0)
+        calls.append(user_request)
+        return f"async ok: {user_request}"
+
+    agent = runtime.build_adapter_agent(spec=_demo_spec(), runner=async_runner)
+    tool = agent.tools[0]
+
+    first_input = {"user_request": "hello"}
+    first_context = ToolCallHookContext(
+        tool_name=runtime.SPECIALIST_TOOL_NAME,
+        tool_input=first_input,
+        tool=tool,
+        agent=agent,
+    )
+    assert runtime._before_adapter_tool_call(first_context) is None
+    assert tool.run(**first_input) == "async ok: hello"
+
+    second_input = {"user_request": "hello again"}
+    second_context = ToolCallHookContext(
+        tool_name=runtime.SPECIALIST_TOOL_NAME,
+        tool_input=second_input,
+        tool=tool,
+        agent=agent,
+    )
+    assert runtime._before_adapter_tool_call(second_context) is None
+
+    assert second_input["user_request"].startswith(runtime.COOLDOWN_SENTINEL_PREFIX)
+    assert tool.run(**second_input) == (
+        "Cooldown active for demo_specialist. Try again in 60 seconds."
+    )
+    assert calls == ["hello"]
+
+
+def test_runtime_adapter_cooldown_hook_tracks_specialists_independently(monkeypatch):
+    runtime.reset_cooldown_state_for_tests()
+    monkeypatch.setenv("COOLDOWN_SECONDS", "60")
+    calls: list[str] = []
+
+    async def async_runner(user_request: str) -> str:
+        await asyncio.sleep(0)
+        calls.append(user_request)
+        return f"async ok: {user_request}"
+
+    first_agent = runtime.build_adapter_agent(spec=_demo_spec(), runner=async_runner)
+    second_spec = runtime.SpecialistServerSpec(
+        specialist_id="other_specialist",
+        display_name="Other Specialist",
+        description="demo",
+        port=9556,
+        skills=[
+            AgentSkill(
+                id="other",
+                name="Other",
+                description="Other skill",
+                tags=["demo"],
+            )
+        ],
+    )
+    second_agent = runtime.build_adapter_agent(spec=second_spec, runner=async_runner)
+
+    first_input = {"user_request": "first"}
+    runtime._before_adapter_tool_call(
+        ToolCallHookContext(
+            tool_name=runtime.SPECIALIST_TOOL_NAME,
+            tool_input=first_input,
+            tool=first_agent.tools[0],
+            agent=first_agent,
+        )
+    )
+    assert first_agent.tools[0].run(**first_input) == "async ok: first"
+
+    second_input = {"user_request": "second"}
+    runtime._before_adapter_tool_call(
+        ToolCallHookContext(
+            tool_name=runtime.SPECIALIST_TOOL_NAME,
+            tool_input=second_input,
+            tool=second_agent.tools[0],
+            agent=second_agent,
+        )
+    )
+    assert second_agent.tools[0].run(**second_input) == "async ok: second"
+    assert calls == ["first", "second"]
+
+
+def test_runtime_adapter_cooldown_hook_ignores_run_specialist_without_adapter_metadata(monkeypatch):
+    runtime.reset_cooldown_state_for_tests()
+    monkeypatch.setenv("COOLDOWN_SECONDS", "60")
+
+    async def async_runner(user_request: str) -> str:
+        await asyncio.sleep(0)
+        return f"async ok: {user_request}"
+
+    agent = runtime.build_adapter_agent(spec=_demo_spec(), runner=async_runner)
+    tool = agent.tools[0]
+    delattr(agent, "_specialist_id")
+
+    tool_input = {"user_request": "hello"}
+    context = ToolCallHookContext(
+        tool_name=runtime.SPECIALIST_TOOL_NAME,
+        tool_input=tool_input,
+        tool=tool,
+        agent=agent,
+    )
+
+    assert runtime._before_adapter_tool_call(context) is None
+    assert tool_input == {"user_request": "hello"}
+
+
+def test_runtime_adapter_agent_has_specialist_id_metadata():
+    async def async_runner(user_request: str) -> str:
+        await asyncio.sleep(0)
+        return f"async ok: {user_request}"
+
+    agent = runtime.build_adapter_agent(spec=_demo_spec(), runner=async_runner)
+
+    assert getattr(agent, "_specialist_id") == "demo_specialist"
+
+
+def test_runtime_adapter_cooldown_hook_does_not_depend_on_tool_identity(monkeypatch):
+    runtime.reset_cooldown_state_for_tests()
+    monkeypatch.setenv("COOLDOWN_SECONDS", "60")
+
+    async def async_runner(user_request: str) -> str:
+        await asyncio.sleep(0)
+        return f"async ok: {user_request}"
+
+    agent = runtime.build_adapter_agent(spec=_demo_spec(), runner=async_runner)
+
+    first_input = {"user_request": "hello"}
+    runtime._before_adapter_tool_call(
+        ToolCallHookContext(
+            tool_name=runtime.SPECIALIST_TOOL_NAME,
+            tool_input=first_input,
+            tool=object(),
+            agent=agent,
+        )
+    )
+    assert first_input == {"user_request": "hello"}
+
+    second_input = {"user_request": "hello again"}
+    runtime._before_adapter_tool_call(
+        ToolCallHookContext(
+            tool_name=runtime.SPECIALIST_TOOL_NAME,
+            tool_input=second_input,
+            tool=object(),
+            agent=agent,
+        )
+    )
+
+    assert second_input["user_request"].startswith(runtime.COOLDOWN_SENTINEL_PREFIX)
+
+
+def test_runtime_adapter_cooldown_hook_ignores_non_specialist_tool_names(monkeypatch):
+    runtime.reset_cooldown_state_for_tests()
+    monkeypatch.setenv("COOLDOWN_SECONDS", "60")
+
+    async def async_runner(user_request: str) -> str:
+        await asyncio.sleep(0)
+        return f"async ok: {user_request}"
+
+    agent = runtime.build_adapter_agent(spec=_demo_spec(), runner=async_runner)
+    tool_input = {"destination": "Tokyo"}
+    context = ToolCallHookContext(
+        tool_name="get_destination_info",
+        tool_input=tool_input,
+        tool=agent.tools[0],
+        agent=agent,
+    )
+
+    assert runtime._before_adapter_tool_call(context) is None
+    assert tool_input == {"destination": "Tokyo"}
 
 
 def test_runtime_a2a_endpoint_can_await_async_adapter_tool(monkeypatch):

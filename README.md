@@ -112,7 +112,7 @@ Switching between OpenAI and Anthropic requires only changing `LLM_PROVIDER` —
 
 ## Running the system
 
-Current implemented runtime scope is **Step 1 through Step 6** (tool servers, direct specialist crews, specialist A2A servers, and the A2A orchestrator CLI).
+Current implemented runtime scope is **Step 1 through Step 8** (tool servers, direct specialist crews, specialist A2A servers, A2A orchestrator CLI, and adapter-level specialist cooldown).
 
 ### Step 1 — Seed the database (first run only)
 
@@ -193,6 +193,23 @@ python main.py
 
 The orchestrator fetches the specialist Agent Cards and delegates via A2A. It does not import specialist crew code directly.
 
+### Step 7/8 — Cooldown guard (Recommended Build Order Step 7 + Step 8)
+
+Cooldown is enforced by a shared `CooldownGuard` through CrewAI's `before_tool_call` hook on each A2A adapter agent's `run_specialist` tool.
+
+Set `COOLDOWN_SECONDS=10` in `.env` for faster testing. Then call the same specialist twice within the cooldown window. The second call returns a cooldown message without invoking the specialist crew:
+
+```bash
+python main.py "Plan a 5-day trip to Tokyo for two people"
+python main.py "Plan a 5-day trip to Kyoto for two people"
+```
+
+Expected second response when both prompts route to `itinerary_specialist`:
+
+```text
+Cooldown active for itinerary_specialist. Try again in 10 seconds.
+```
+
 ### A2A Prompt Test Harness
 
 Prerequisites:
@@ -252,7 +269,7 @@ python -m agents.budget 'Optimize this package under $3000. Route: NYC to Tokyo.
 
 Use `--verbose` to see the CrewAI task/tool trace.
 
-Planned (not yet implemented): cooldown guard and session-state routing flow.
+Implemented: adapter-level cooldown guard. Planned: session-state routing flow.
 
 ---
 
@@ -479,7 +496,7 @@ curl http://localhost:9003/.well-known/agent-card.json | python3 -m json.tool
 
 Expected: valid JSON Agent Cards with `name`, `description`, and `skills` fields.
 
-### Module 4 — Cooldown guard (Planned / Not Yet Implemented)
+### Module 4 — Cooldown guard (Implemented in combined Step 7/8)
 
 Set `COOLDOWN_SECONDS=10` in `.env` for faster testing. Start `python main.py` and enter the same itinerary request twice within 10 seconds. The second call should be blocked:
 
@@ -487,7 +504,7 @@ Set `COOLDOWN_SECONDS=10` in `.env` for faster testing. Start `python main.py` a
 > Plan a trip to Tokyo
 [... itinerary output ...]
 > Plan a trip to Kyoto
-[Cooldown active for itinerary_specialist. Try again in 8 seconds.]
+Cooldown active for itinerary_specialist. Try again in 8 seconds.
 ```
 
 ### Module 5 — Session state (Planned / Not Yet Implemented)
@@ -527,6 +544,7 @@ Set `LLM_PROVIDER=anthropic` in `.env` and add your `ANTHROPIC_API_KEY`. CrewAI'
 |----------|----------|
 | `PRD.docx` | Product requirements, learning objectives, full module scope |
 | `ARCHITECTURE.docx` | Agent definitions (role/goal/backstory), task definitions, tool schemas, event sequence diagrams, data contracts |
+| `docs/Step7Step8Plan_CooldownBeforeToolCall.md` | Combined cooldown implementation plan using CrewAI `before_tool_call` |
 
 ---
 

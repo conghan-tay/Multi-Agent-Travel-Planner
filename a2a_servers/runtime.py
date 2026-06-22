@@ -20,14 +20,22 @@ from crewai import Agent
 from crewai.a2a.config import A2AServerConfig
 from crewai.a2a.utils.task import cancel as cancel_task
 from crewai.a2a.utils.task import execute as execute_task
+from crewai.hooks import register_before_tool_call_hook
+from crewai.hooks.tool_hooks import ToolCallHookContext
 from crewai.tools import tool
 from dotenv import load_dotenv
+
+from guards.cooldown_guard import CooldownGuard
 
 SPECIALIST_TOOL_NAME = "run_specialist"
 AGENT_CARD_PATH = "/.well-known/agent-card.json"
 JSONRPC_PATH = "/a2a"
+COOLDOWN_SENTINEL_PREFIX = "__crew_mas_cooldown_blocked__:"
 SpecialistRunner = Callable[[str], Awaitable[str]]
 logger = logging.getLogger(__name__)
+_cooldown_guard = CooldownGuard()
+_cooldown_hook_registered = False
+_cooldown_hook_lock = threading.Lock()
 
 
 @dataclass(frozen=True)
@@ -49,8 +57,87 @@ def _resolve_adapter_model() -> str:
     return os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 
+def _resolve_cooldown_seconds() -> int:
+    raw_value = os.getenv("COOLDOWN_SECONDS", "60").strip()
+    try:
+        cooldown_seconds = int(raw_value)
+    except ValueError:
+        logger.warning("Invalid COOLDOWN_SECONDS=%r. Falling back to 60.", raw_value)
+        return 60
+    return max(cooldown_seconds, 0)
+
+
 def _format_runner_error(exc: Exception) -> str:
     return f"Specialist execution failed. {type(exc).__name__}: {exc}"
+
+
+def _format_cooldown_message(specialist_id: str, remaining_seconds: int) -> str:
+    return (
+        f"Cooldown active for {specialist_id}. "
+        f"Try again in {remaining_seconds} seconds."
+    )
+
+
+def _build_cooldown_sentinel(message: str) -> str:
+    return f"{COOLDOWN_SENTINEL_PREFIX}{message}"
+
+
+def _extract_cooldown_sentinel(user_request: str) -> str | None:
+    if user_request.startswith(COOLDOWN_SENTINEL_PREFIX):
+        return user_request.removeprefix(COOLDOWN_SENTINEL_PREFIX)
+    return None
+
+
+def _before_adapter_tool_call(context: ToolCallHookContext) -> bool | None:
+    """Apply cooldown only to A2A adapter agents."""
+    if context.tool_name != SPECIALIST_TOOL_NAME:
+        return None
+
+    specialist_id = getattr(context.agent, "_specialist_id", None)
+    if specialist_id is None:
+        diagnostic_message = (
+            "cooldown hook skipped run_specialist call without "
+            f"adapter specialist metadata agent_role={getattr(context.agent, 'role', None)!r}"
+        )
+        logger.warning(diagnostic_message)
+        return None
+
+    _cooldown_guard.cooldown_seconds = _resolve_cooldown_seconds()
+    decision = _cooldown_guard.check_and_mark(specialist_id)
+    diagnostic_message = (
+        "cooldown check "
+        f"specialist_id={specialist_id} "
+        f"allowed={decision.allowed} "
+        f"remaining_seconds={decision.remaining_seconds}"
+    )
+    logger.warning(diagnostic_message)
+    if decision.allowed:
+        return None
+
+    message = _format_cooldown_message(
+        specialist_id=specialist_id,
+        remaining_seconds=decision.remaining_seconds,
+    )
+    context.tool_input["user_request"] = _build_cooldown_sentinel(message)
+    return None
+
+
+def _ensure_cooldown_hook_registered() -> None:
+    global _cooldown_hook_registered
+
+    if _cooldown_hook_registered:
+        return
+
+    with _cooldown_hook_lock:
+        if _cooldown_hook_registered:
+            return
+        register_before_tool_call_hook(_before_adapter_tool_call)
+        _cooldown_hook_registered = True
+
+
+def reset_cooldown_state_for_tests() -> None:
+    """Reset adapter cooldown state without unregistering the process-wide hook."""
+    _cooldown_guard.reset()
 
 
 def _run_async_runner(runner: SpecialistRunner, user_request: str) -> str:
@@ -85,6 +172,10 @@ def _build_run_specialist_tool(runner: SpecialistRunner):
     @tool(SPECIALIST_TOOL_NAME)
     def run_specialist(user_request: str) -> str:
         """Execute the wrapped specialist crew for one user request."""
+        cooldown_message = _extract_cooldown_sentinel(user_request)
+        if cooldown_message is not None:
+            return cooldown_message
+
         try:
             return _run_async_runner(runner, user_request)
         except Exception as exc:
@@ -104,12 +195,13 @@ def build_adapter_agent(
 ) -> Agent:
     """Create an adapter agent with A2A server metadata."""
     run_specialist_tool = _build_run_specialist_tool(runner)
+    _ensure_cooldown_hook_registered()
     server_config = A2AServerConfig(
         name=spec.specialist_id,
         description=spec.description,
         skills=spec.skills,
     )
-    return Agent(
+    adapter_agent = Agent(
         role=f"{spec.display_name} Adapter",
         goal=(
             "Handle one delegated user request by calling run_specialist exactly once "
@@ -124,6 +216,8 @@ def build_adapter_agent(
         verbose=False,
         a2a=server_config,
     )
+    setattr(adapter_agent, "_specialist_id", spec.specialist_id)
+    return adapter_agent
 
 
 class CrewAIA2AExecutorBridge(A2AAgentExecutor):
