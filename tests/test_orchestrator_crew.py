@@ -118,6 +118,12 @@ def test_build_a2a_client_configs_uses_configured_endpoints():
     configs = mod.build_a2a_client_configs(endpoints)
 
     assert [config.endpoint for config in configs] == list(endpoints)
+    assert all(config.trust_remote_completion_status is True for config in configs)
+    assert all(config.max_turns == 3 for config in configs)
+    assert all(
+        config.accepted_output_modes == ["text/plain", "application/json"]
+        for config in configs
+    )
 
 
 def test_orchestrator_constructor_has_no_dotenv_side_effect(monkeypatch):
