@@ -61,18 +61,21 @@ def build_a2a_client_configs(
             endpoint=endpoints[0],
             timeout=180,
             max_turns=3,
+            trust_remote_completion_status=True,
             accepted_output_modes=["text/plain", "application/json"],
         ),
         A2AClientConfig(
             endpoint=endpoints[1],
             timeout=180,
             max_turns=3,
+            trust_remote_completion_status=True,
             accepted_output_modes=["text/plain", "application/json"],
         ),
         A2AClientConfig(
             endpoint=endpoints[2],
             timeout=180,
             max_turns=3,
+            trust_remote_completion_status=True,
             accepted_output_modes=["text/plain", "application/json"],
         ),
     ]
